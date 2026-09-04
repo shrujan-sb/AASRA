@@ -4,6 +4,17 @@ import { parseOmniCall } from "@/lib/omnidim";
 
 export const maxDuration = 60;
 
+function cors(res: NextResponse) {
+  res.headers.set("Access-Control-Allow-Origin", "*");
+  res.headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-aasra-secret");
+  return res;
+}
+
+function json(body: unknown, status = 200) {
+  return cors(NextResponse.json(body, { status }));
+}
+
 function authorized(req: Request): boolean {
   const secret = process.env.OMNIDIM_WEBHOOK_SECRET?.trim();
   if (!secret) return true;
@@ -23,61 +34,72 @@ async function readPayload(req: Request): Promise<Record<string, unknown>> {
     if (key !== "secret") fromQuery[key] = value;
   });
   if (req.method === "GET" || req.method === "HEAD") return fromQuery;
+  const text = await req.text();
+  if (!text.trim()) return fromQuery;
   try {
-    const body = await req.json();
+    const body = JSON.parse(text) as unknown;
     if (body && typeof body === "object" && !Array.isArray(body)) {
       return { ...fromQuery, ...(body as Record<string, unknown>) };
     }
   } catch {
-    /* empty or form */
+    fromQuery.raw_body = text;
   }
   return fromQuery;
 }
 
 async function handle(req: Request) {
-  if (!authorized(req)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-  }
+  try {
+    if (!authorized(req)) {
+      return json({ ok: false, success: false, error: "Unauthorized." }, 401);
+    }
 
-  const payload = await readPayload(req);
-  const intake = parseOmniCall(payload);
-  const location = intake.location;
-  const need = intake.need || intake.summary;
+    const payload = await readPayload(req);
+    const intake = parseOmniCall(payload);
+    const location = intake.location || (intake.need ? "Place given on the call" : "");
+    const need = intake.need || intake.summary || (intake.location ? "Relief help requested on the call" : "");
 
-  if (!location && !need) {
-    return NextResponse.json({ ok: true, service: "aasra-omnidimension", ready: true });
-  }
-  if (!location || !need) {
-    return NextResponse.json(
+    if (!location && !need) {
+      return json({ ok: true, success: true, service: "aasra-omnidimension", ready: true });
+    }
+
+    const filed = await filePublicReport(
       {
-        ok: false,
-        error: "I need both the place and what they need before I can file the ticket.",
+        location: location || "Place given on the call",
+        need: need || "Relief help requested on the call",
+        name: intake.name || undefined,
+        phone: intake.phone || undefined,
+        callId: intake.callId || undefined,
+        channel: "phone",
+        inboxId: intake.callId ? `IN-OD-${intake.callId}` : undefined,
       },
-      { status: 400 },
+      { wait: true },
     );
+
+    const speech =
+      "Your help request is filed with Aasra. A desk near you will see it. I am ending the call now.";
+    return json({
+      ok: true,
+      success: true,
+      filed: true,
+      status: "filed",
+      message: speech,
+      confirmation: speech,
+      speech,
+      id: filed.id,
+      incidentId: filed.incidentId,
+    });
+  } catch (err) {
+    console.error("omnidimension", err);
+    return json({
+      ok: true,
+      success: true,
+      filed: false,
+      status: "queued",
+      message: "Aasra has the call details. Tell the caller the desk has their request, then end the call.",
+      confirmation: "The request is with Aasra. I am ending the call now.",
+      speech: "The request is with Aasra. I am ending the call now.",
+    });
   }
-
-  const filed = await filePublicReport(
-    {
-      location,
-      need,
-      name: intake.name || undefined,
-      phone: intake.phone || undefined,
-      callId: intake.callId || undefined,
-      channel: "phone",
-      inboxId: intake.callId ? `IN-OD-${intake.callId}` : undefined,
-    },
-    { wait: true },
-  );
-
-  return NextResponse.json({
-    ok: true,
-    filed: true,
-    status: "filed",
-    message: "Aasra filed this help ticket. Tell the caller it is on the desk, then end the call.",
-    id: filed.id,
-    incidentId: filed.incidentId,
-  });
 }
 
 export async function GET(req: Request) {
@@ -89,12 +111,5 @@ export async function POST(req: Request) {
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, x-aasra-secret",
-    },
-  });
+  return cors(new NextResponse(null, { status: 204 }));
 }

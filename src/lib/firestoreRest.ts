@@ -26,7 +26,7 @@ export async function createFirestoreDoc(col: string, id: string, data: Record<s
   try {
     const done = Promise.race([
       setDoc(doc(getFirestore(app), col, id), { ...JSON.parse(JSON.stringify({ ...data, id })) }, { merge: true }),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 2500)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 8000)),
     ]);
     await done;
     return true;
@@ -58,7 +58,7 @@ export async function listFirestoreCol(col: string): Promise<Record<string, unkn
   try {
     const snap = await Promise.race([
       getDocs(collection(getFirestore(app), col)),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 2500)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 8000)),
     ]);
     return snap.docs.map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id }));
   } catch (err) {

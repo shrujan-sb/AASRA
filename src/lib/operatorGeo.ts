@@ -10,6 +10,8 @@ export type OperatorGeo = {
 
 const KEY = "aasra-geo";
 
+export const INDIA_CENTER = { lat: 20.5937, lng: 78.9629 } as const;
+
 export function readCachedGeo(): OperatorGeo | null {
   if (typeof window === "undefined") return null;
   try {
@@ -23,11 +25,14 @@ export function readCachedGeo(): OperatorGeo | null {
   return null;
 }
 
-export function useOperatorGeo() {
+export function useOperatorGeo(fallback = true) {
   const [geo, setGeo] = useState<OperatorGeo | null>(readCachedGeo);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      if (fallback) setGeo(INDIA_CENTER);
+      return;
+    }
     const id = navigator.geolocation.watchPosition(
       (pos) => {
         const next: OperatorGeo = {
@@ -43,12 +48,13 @@ export function useOperatorGeo() {
         }
       },
       () => {
-        if (!readCachedGeo()) setGeo(null);
+        const cached = readCachedGeo();
+        setGeo(cached ?? (fallback ? INDIA_CENTER : null));
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 30_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, []);
+  }, [fallback]);
 
-  return geo;
+  return geo ?? (fallback ? INDIA_CENTER : null);
 }

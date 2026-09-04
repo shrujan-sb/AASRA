@@ -1,4 +1,5 @@
 import { buildPublicReport, type PublicReportInput } from "@/lib/buildPublicReport";
+import { persistTicketNow } from "@/lib/cloudOps";
 import { reasonFromStudy, studyReport } from "@/lib/featherless";
 import { rankNearestSupport } from "@/lib/nearest";
 import { geocodePlace } from "@/lib/places";
@@ -48,12 +49,7 @@ async function enrichTicket(payload: FiledReport, location: string, need: string
     payload.incident.updatedAt = Date.now();
     payload.log.message = `Clerk decided ${payload.incident.severity} ${payload.incident.priorityScore} @ ${payload.incident.locationLabel}`;
   }
-  await Promise.all([
-    rest.createFirestoreDoc("inbox", payload.inbox.id, payload.inbox as unknown as Record<string, unknown>),
-    rest.createFirestoreDoc("events", payload.event.id, payload.event as unknown as Record<string, unknown>),
-    rest.createFirestoreDoc("incidents", payload.incident.id, payload.incident as unknown as Record<string, unknown>),
-    rest.createFirestoreDoc("agentLogs", payload.log.id, payload.log as unknown as Record<string, unknown>),
-  ]);
+  await persistTicketNow(payload);
 }
 
 export async function filePublicReport(
@@ -76,6 +72,7 @@ export async function filePublicReport(
   }
   const ticket = await buildPublicReport({ ...input, lat, lng });
   const payload = JSON.parse(JSON.stringify(ticket)) as FiledReport;
+  await persistTicketNow(payload);
   const job = enrichTicket(payload, input.location, input.need, input.name).catch((err) => {
     console.error("file report enrich", err);
   });

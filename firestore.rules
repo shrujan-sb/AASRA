@@ -6,20 +6,20 @@ service cloud.firestore {
     }
 
     match /inbox/{id} {
-      allow create: if true;
-      allow read, update: if isSignedIn();
+      allow create, read: if true;
+      allow update: if isSignedIn();
     }
     match /events/{id} {
-      allow create: if true;
-      allow read, update: if isSignedIn();
+      allow create, read: if true;
+      allow update: if isSignedIn();
     }
     match /incidents/{id} {
-      allow create: if true;
-      allow read, update: if isSignedIn();
+      allow create, read: if true;
+      allow update: if isSignedIn();
     }
     match /agentLogs/{id} {
-      allow create: if true;
-      allow read, update: if isSignedIn();
+      allow create, read: if true;
+      allow update: if isSignedIn();
     }
     match /applications/{id} {
       allow create: if request.resource.data.status == "pending"

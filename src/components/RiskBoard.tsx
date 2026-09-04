@@ -1,11 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { useOps } from "@/lib/useOps";
 import { useOperatorGeo } from "@/lib/operatorGeo";
-
-const GeoRiskMap = dynamic(() => import("@/components/GeoRiskMap").then((m) => m.GeoRiskMap), { ssr: false });
 
 type LiveRisk = {
   ok?: boolean;
@@ -19,7 +15,6 @@ type LiveRisk = {
 };
 
 export function RiskBoard({ embedded = false }: { embedded?: boolean }) {
-  const { incidents } = useOps();
   const geo = useOperatorGeo();
   const [live, setLive] = useState<LiveRisk | null>(null);
   const [err, setErr] = useState("");
@@ -30,15 +25,19 @@ export function RiskBoard({ embedded = false }: { embedded?: boolean }) {
     void fetch(`/api/live-risk?lat=${geo.lat}&lng=${geo.lng}`, { signal: ac.signal })
       .then((r) => r.json())
       .then((data: LiveRisk) => {
-        if (data.ok) setLive(data);
-        else setErr("Could not read live weather for this pin.");
+        if (data.ok) {
+          setLive(data);
+          setErr("");
+        }
       })
-      .catch(() => setErr("Live risk request failed."));
+      .catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setErr("Live weather is delayed. Preplan still uses the citizen queue.");
+      });
     return () => ac.abort();
   }, [geo?.lat, geo?.lng]);
 
   const level = live?.level ?? "watch";
-  const km = live?.boundaryKm ?? 8;
 
   return (
     <div className={embedded ? "space-y-4" : "h-full overflow-auto bg-[var(--paper)]"}>
@@ -77,9 +76,6 @@ export function RiskBoard({ embedded = false }: { embedded?: boolean }) {
               {live?.headline || "Reading rain and nearby alerts for your pin…"}
             </p>
           </section>
-          <div className="border border-[var(--ink)] overflow-hidden">
-            <GeoRiskMap lat={geo.lat} lng={geo.lng} level={level} boundaryKm={km} incidents={incidents} />
-          </div>
           {live?.problems && live.problems.length > 0 ? (
             <section>
               <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Live web</p>

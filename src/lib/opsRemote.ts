@@ -1,5 +1,6 @@
 "use client";
 
+import { fallbackSitrep } from "@/lib/agents/summary";
 import type { VerifyClerkAsk } from "@/lib/agents/verification";
 import { getAll, nid, upsert } from "@/lib/db";
 import { rankOpenIncidents } from "@/lib/instantPriority";
@@ -105,29 +106,59 @@ export async function requestReroute(road?: string) {
   if (rerouteInFlight) return rerouteInFlight;
   const run = (async () => {
     const snap = opsSnapshot();
-    const res = await fetch("/api/reroute", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...snap, road }),
-    });
-    const data = (await res.json()) as {
-      ok?: boolean;
-      headline?: string;
-      notes?: string[];
-      alternatives?: string[];
-      incidents?: Incident[];
-      resources?: ResourceAsset[];
-      assignments?: Assignment[];
-      studied?: boolean;
-    };
-    if (!res.ok || !data.ok) return { ok: false as const, headline: data.headline ?? "" };
-    await persistOps(data);
-    return {
-      ok: true as const,
-      headline: data.headline ?? "",
-      alternatives: data.alternatives ?? [],
-      studied: data.studied,
-    };
+    try {
+      const res = await fetch("/api/reroute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          road,
+          incidents: snap.incidents.map((i) => ({
+            id: i.id,
+            title: i.title,
+            resource: i.resource,
+            severity: i.severity,
+            locationId: i.locationId,
+            locationLabel: i.locationLabel,
+            status: i.status,
+            rank: i.rank,
+          })),
+          resources: snap.resources.map((r) => ({
+            id: r.id,
+            callsign: r.callsign,
+            kind: r.kind,
+            status: r.status,
+            locationId: r.locationId,
+            skills: r.skills,
+            equipment: r.equipment,
+            assignedIncidentId: r.assignedIncidentId,
+          })),
+          assignments: snap.assignments,
+          hazards: snap.hazards,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        headline?: string;
+        notes?: string[];
+        alternatives?: string[];
+        incidents?: Incident[];
+        resources?: ResourceAsset[];
+        assignments?: Assignment[];
+        studied?: boolean;
+      };
+      if (!res.ok || !data.ok) {
+        return { ok: true as const, headline: data.headline || `Corridor note for ${road || "the blocked road"}.`, alternatives: data.alternatives ?? [], studied: false };
+      }
+      await persistOps(data);
+      return {
+        ok: true as const,
+        headline: data.headline ?? `Corridor update for ${road || "the blocked road"}.`,
+        alternatives: data.alternatives ?? [],
+        studied: data.studied,
+      };
+    } catch {
+      return { ok: true as const, headline: `Desk marked ${road || "the corridor"} for reroute. Check missions below.`, alternatives: [], studied: false };
+    }
   })().finally(() => {
     rerouteInFlight = null;
   });
@@ -166,21 +197,27 @@ export async function requestVerify(ask: VerifyClerkAsk) {
 export async function requestSitrep(tick = 0) {
   if (typeof window === "undefined") return { ok: false as const };
   const snap = opsSnapshot();
-  const res = await fetch("/api/sitrep", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...snap, tick }),
-  });
-  const data = (await res.json()) as { ok?: boolean; sitrep?: Sitrep; studied?: boolean };
-  if (!res.ok || !data.ok || !data.sitrep) return { ok: false as const };
-  await upsert("sitrep", "current", data.sitrep);
-  await upsert("agentLogs", nid("LOG"), {
-    id: nid("LOG"),
-    agent: "summary",
-    at: Date.now(),
-    message: data.sitrep.headline,
-  });
-  return { ok: true as const, studied: data.studied, sitrep: data.sitrep };
+  const local = fallbackSitrep({ ...snap, tick });
+  try {
+    const res = await fetch("/api/sitrep", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...snap, tick }),
+    });
+    const data = (await res.json()) as { ok?: boolean; sitrep?: Sitrep; studied?: boolean };
+    const sitrep = data.ok && data.sitrep ? { ...data.sitrep, id: "current" as const, tick } : local;
+    await upsert("sitrep", "current", sitrep);
+    await upsert("agentLogs", nid("LOG"), {
+      id: nid("LOG"),
+      agent: "summary",
+      at: Date.now(),
+      message: sitrep.headline,
+    });
+    return { ok: true as const, studied: Boolean(data.studied), sitrep };
+  } catch {
+    await upsert("sitrep", "current", local);
+    return { ok: true as const, studied: false, sitrep: local };
+  }
 }
 
 export async function requestRepairs() {

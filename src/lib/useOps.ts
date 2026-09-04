@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listen } from "@/lib/db";
+import { listen, mergeCloud } from "@/lib/db";
 import type { AgentLog, Assignment, Hazard, Incident, InboxMessage, InfraAsset, ResourceAsset, Sitrep, StructuredEvent } from "@/lib/types";
 
 export function useOps() {
@@ -27,7 +27,25 @@ export function useOps() {
       listen<Sitrep>("sitrep", (rows) => setSitrep(rows.find((r) => r.id === "current") ?? null)),
       listen("infra", setInfra),
     ];
-    return () => u.forEach((fn) => fn());
+    let live = true;
+    const pull = () => {
+      void fetch("/api/ops-pull", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((data: { ok?: boolean; incidents?: Array<Record<string, unknown> & { id: string }>; events?: Array<Record<string, unknown> & { id: string }>; inbox?: Array<Record<string, unknown> & { id: string }> }) => {
+          if (!live || !data.ok) return;
+          for (const row of data.incidents ?? []) if (row.id) mergeCloud("incidents", row);
+          for (const row of data.events ?? []) if (row.id) mergeCloud("events", row);
+          for (const row of data.inbox ?? []) if (row.id) mergeCloud("inbox", row);
+        })
+        .catch(() => undefined);
+    };
+    pull();
+    const id = window.setInterval(pull, 8000);
+    return () => {
+      live = false;
+      window.clearInterval(id);
+      u.forEach((fn) => fn());
+    };
   }, []);
 
   return {

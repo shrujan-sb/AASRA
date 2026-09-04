@@ -106,6 +106,19 @@ export function unitRole(r: ResourceAsset): "boat" | "medical" | "tanker" | "oth
   return "other";
 }
 
+function wardFromIncident(i: Incident): string | null {
+  if (WARDS.some((w) => w.id === i.locationId)) return i.locationId;
+  const label = `${i.locationLabel} ${i.title} ${i.resource}`.toLowerCase();
+  if (/tenali/.test(label)) return "W17";
+  if (/tadepalli/.test(label)) return "W15";
+  if (/autonagar/.test(label)) return "W19";
+  if (/guntur/.test(label)) return "W21";
+  if (/krishnalanka|prasadampadu/.test(label)) return "W3";
+  if (/vijayawada|bandar|eluru road/.test(label)) return "W8";
+  const hit = WARDS.find((w) => label.includes(w.name.toLowerCase()));
+  return hit?.id ?? null;
+}
+
 function scoreWard(id: string, hazards: Hazard[], incidents: Incident[]): number {
   const p = WARD_PROFILES.find((w) => w.id === id);
   let n = 0;
@@ -115,18 +128,41 @@ function scoreWard(id: string, hazards: Hazard[], incidents: Incident[]): number
   if (p && p.population > 20000) n += 10;
   if (/canal|island|nala|paddy|lowest/i.test(p?.terrain ?? "")) n += 16;
   if (hazards.some((h) => h.status === "blocked" && (h.roadId === id || h.label.includes(p?.city ?? "___")))) n += 18;
-  n += incidents.filter((i) => i.locationId === id && i.status !== "resolved").length * 8;
+  for (const i of incidents) {
+    if (i.status === "resolved") continue;
+    if (i.locationId === id) n += 12;
+    const ward = wardFromIncident(i);
+    if (ward === id) n += 14;
+    if (i.severity === "critical" && (i.locationId === id || ward === id)) n += 20;
+    if (/trap|boat|medic|water|blanket/i.test(`${i.title} ${i.resource}`) && ward === id) n += 6;
+  }
   return n;
 }
 
 const STAGE_DESTS = ["W17", "W3", "W15", "SH-C"] as const;
+
+function stageDestinations(incidents: Incident[]): string[] {
+  const open = incidents.filter((i) => i.status !== "resolved");
+  const fromCitizens = open
+    .map((i) => wardFromIncident(i))
+    .filter((id): id is string => Boolean(id));
+  if (fromCitizens.length) {
+    return [...new Set(fromCitizens)].filter((id) => WARDS.some((w) => w.id === id)).slice(0, 4);
+  }
+  return [...STAGE_DESTS].filter((id) => WARDS.some((w) => w.id === id));
+}
 
 export function fallbackPreposition(input: {
   resources: ResourceAsset[];
   incidents?: Incident[];
   hazards?: Hazard[];
 }): PrepositionPlan {
-  const dests = STAGE_DESTS.filter((id) => WARDS.some((w) => w.id === id));
+  const incidents = input.incidents ?? [];
+  const dests = stageDestinations(incidents);
+  const topCitizen = incidents.filter((i) => i.status !== "resolved").slice(0, 3);
+  const citizenLine = topCitizen.length
+    ? `Citizen queue points staging toward ${topCitizen.map((i) => i.locationLabel).join(", ")}.`
+    : "";
   const free = input.resources.filter((r) => r.status === "free");
   const boats = free.filter(isBoat);
   const meds = free.filter(isMed);
@@ -147,7 +183,10 @@ export function fallbackPreposition(input: {
       fromId: m.r.locationId,
       toId: m.to,
       toLabel: wardById(m.to).name,
-      why: `Stage ${m.tag} before the canal belt and island cut out.`,
+      why:
+        topCitizen[0] && m.to === wardFromIncident(topCitizen[0])
+          ? `Stage for ${topCitizen[0].resource} at ${topCitizen[0].locationLabel}.`
+          : `Stage ${m.tag} before the canal belt and island cut out.`,
     }));
   const sites: PrepSite[] = dests.map((id) => ({
     id,
@@ -163,8 +202,10 @@ export function fallbackPreposition(input: {
   }));
   const named = dests.map((id) => wardById(id).name).join(", ");
   return {
-    headline: `Stage ${nBoats} boats, ${nMed} medical teams and ${nTank} tankers on the canal belt before landfall.`,
-    orders: `Before the cyclone arrives, move ${nBoats} rescue boats, ${nMed} medical teams and ${nTank} water tankers to ${named}.`,
+    headline: topCitizen.length
+      ? `Preplan from ${topCitizen.length} citizen ticket(s): stage boats, med, and water toward ${named}.`
+      : `Stage ${nBoats} boats, ${nMed} medical teams and ${nTank} tankers on the canal belt before landfall.`,
+    orders: `${citizenLine} Before the cyclone arrives, move ${nBoats} rescue boats, ${nMed} medical teams and ${nTank} water tankers to ${named}.`.trim(),
     boats: nBoats,
     medical: nMed,
     tankers: nTank,

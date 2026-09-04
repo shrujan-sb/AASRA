@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { LangSwitcher } from "@/components/LangSwitcher";
+import { CallNowButton } from "@/components/CallNowButton";
 import { useLang } from "@/lib/i18n";
 
 export function Header() {
@@ -18,7 +19,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--ink)] bg-[var(--paper)]">
-      <div className="site-wrap flex h-[72px] items-center gap-6">
+      <div className="site-wrap flex min-h-[64px] items-center gap-3 py-2 sm:h-[72px] sm:gap-6 sm:py-0">
         <Link href="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setOpen(false)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/mark.png" alt="" className="h-8 w-8 object-contain" />
@@ -35,8 +36,9 @@ export function Header() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto hidden md:flex items-center gap-3">
+        <div className="ml-auto hidden md:flex items-center gap-2 lg:gap-3">
           <LangSwitcher />
+          <CallNowButton className="site-btn-call-compact" />
           <Link href="/join" className="site-btn site-btn-paper text-[14px]">
             {t("nav.support")}
           </Link>
@@ -44,7 +46,8 @@ export function Header() {
             {t("nav.report")}
           </Link>
         </div>
-        <div className="ml-auto flex items-center gap-3 md:hidden">
+        <div className="ml-auto flex items-center gap-2 md:hidden">
+          <CallNowButton className="site-btn-call-compact" />
           <LangSwitcher />
           <button
             type="button"
@@ -70,6 +73,7 @@ export function Header() {
             <Link href="/report" className="mt-2 site-btn site-btn-ink" onClick={() => setOpen(false)}>
               {t("nav.report")}
             </Link>
+            <CallNowButton className="mt-2 w-full" />
           </div>
         </div>
       )}

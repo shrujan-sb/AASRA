@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { LangBoard } from "@/components/LangBoard";
-
-export default function LangPage() {
-  return <LangBoard />;
+export default function LangRedirectPage() {
+  redirect("/console");
 }

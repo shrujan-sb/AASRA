@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Site } from "@/components/site/Site";
+import { CallNowButton } from "@/components/CallNowButton";
 import { useAuth } from "@/lib/auth";
 import { useLang } from "@/lib/i18n";
 import { supportDeskPath } from "@/lib/supportKind";
@@ -40,16 +41,6 @@ export function HomeView() {
 
   return (
     <Site>
-      <section className="border-b border-[var(--ink)] bg-[var(--paper)]">
-        <div className="site-wrap flex flex-wrap items-baseline justify-between gap-3 py-3 text-[13px] text-[var(--mute)]">
-          <p className="tracking-[0.16em] uppercase">{t("home.mast")}</p>
-          <p>Vijayawada · Guntur · Tenali</p>
-          <p className="tabular-nums">
-            <MastheadDate />
-          </p>
-        </div>
-      </section>
-
       <section className="border-b border-[var(--ink)]">
         <div className="site-wrap grid w-full items-start gap-14 py-16 lg:grid-cols-12 lg:gap-16 lg:py-20">
           <div className="lg:col-span-7 lg:pt-2">
@@ -67,6 +58,7 @@ export function HomeView() {
               <Link href="/report" className="site-btn site-btn-ink">
                 {t("nav.report")}
               </Link>
+              <CallNowButton />
               <Link href="/how-it-works" className="site-btn site-btn-paper">
                 {t("home.pipeline")}
               </Link>
@@ -104,6 +96,7 @@ export function HomeView() {
                   <Link href="/join" className="site-btn site-btn-paper w-full">
                     {t("nav.support")}
                   </Link>
+                  <CallNowButton className="w-full" />
                   <button
                     type="button"
                     disabled={busy}
@@ -361,21 +354,6 @@ function Clock() {
     return () => clearInterval(id);
   }, []);
   return <span suppressHydrationWarning className="font-medium tabular-nums">{t || "—"}</span>;
-}
-
-function MastheadDate() {
-  const [d, setD] = useState("");
-  useEffect(() => {
-    setD(
-      new Date().toLocaleDateString("en-IN", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }),
-    );
-  }, []);
-  return <span suppressHydrationWarning>{d || "Krishna delta"}</span>;
 }
 
 function PublicRiskStrip() {

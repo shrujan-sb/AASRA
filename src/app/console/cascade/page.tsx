@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { CascadeBoard } from "@/components/CascadeBoard";
-
-export default function CascadePage() {
-  return <CascadeBoard />;
+export default function CascadeRedirectPage() {
+  redirect("/console");
 }

@@ -7,7 +7,6 @@ import { BootScreen } from "@/components/site/BootScreen";
 import { useAuth } from "@/lib/auth";
 import { ensureSeeded, resetSession, startLiveFeed } from "@/lib/pipeline";
 import { useLang } from "@/lib/i18n";
-import { LangSwitcher } from "@/components/LangSwitcher";
 import { useOps } from "@/lib/useOps";
 
 const NAV: { href: string; label: string; hint: string; group: string }[] = [
@@ -16,11 +15,9 @@ const NAV: { href: string; label: string; hint: string; group: string }[] = [
   { href: "/console/sitrep", label: "Sitrep", hint: "Duty brief", group: "Watch" },
   { href: "/console/predict", label: "Predict", hint: "AI + risk", group: "Watch" },
   { href: "/console/feed", label: "Wire", hint: "Needs & offers", group: "Watch" },
-  { href: "/console/lang", label: "Language", hint: "Detect + English", group: "Watch" },
   { href: "/console/verify", label: "Conflict", hint: "Blocked vs open", group: "Watch" },
   { href: "/console/preposition", label: "Stage", hint: "Boats / med / water", group: "Stage" },
   { href: "/console/vulnerable", label: "Vulnerable", hint: "If flood comes", group: "Stage" },
-  { href: "/console/cascade", label: "Knock-on", hint: "Grid cascade", group: "Stage" },
   { href: "/console/repair", label: "Repair", hint: "Roads & bridges", group: "Stage" },
   { href: "/console/map", label: "Map", hint: "Ground picture", group: "Ground" },
   { href: "/console/allocate", label: "Teams", hint: "Who is out", group: "Ground" },
@@ -124,7 +121,6 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               {t("console.out")}
             </button>
-            <LangSwitcher />
           </div>
         </div>
       </aside>

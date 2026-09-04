@@ -43,6 +43,6 @@ export async function POST(req: Request) {
   } catch {
     body = {};
   }
-  const data = await run(body, 0);
+  const data = await run(body, 5000);
   return NextResponse.json(data);
 }

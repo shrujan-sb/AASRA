@@ -14,7 +14,7 @@ export function SitrepBoard() {
     setBusy(true);
     setErr("");
     try {
-      const data = await requestSitrep(sitrep?.tick ?? 0);
+      const data = await requestSitrep((sitrep?.tick ?? 0) + 1);
       if (!data.ok) {
         setErr("Sitrep desk failed.");
         return;
@@ -42,7 +42,7 @@ export function SitrepBoard() {
             type="button"
             disabled={busy}
             onClick={() => void run()}
-            className="h-10 px-4 bg-[var(--ink)] text-[var(--paper)] disabled:opacity-50"
+              className="h-10 min-h-10 px-4 bg-[var(--ink)] text-[var(--paper)] disabled:opacity-50"
           >
             {busy ? "Clerk writing…" : sitrep?.headline ? "Write again" : "Ask the clerk"}
           </button>

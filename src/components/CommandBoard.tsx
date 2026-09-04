@@ -48,15 +48,22 @@ export function CommandBoard() {
         severity?: Incident["severity"];
         priorityScore?: number;
       };
-      if (!res.ok || !data.ok || !data.reason) {
+      if (!res.ok || !data.ok) {
         setErr(data.error || "Study failed.");
         return;
       }
+      const reason = data.reason ?? {
+        summary: `Desk reread ${row.locationLabel}.`,
+        risks: [] as string[],
+        actions: [] as string[],
+        decision: row.title,
+        model: "desk",
+      };
       await upsert("incidents", row.id, {
-        reason: data.reason,
+        reason,
         severity: data.severity ?? row.severity,
         priorityScore: data.priorityScore ?? row.priorityScore,
-        priorityWhy: whyFromStudy(data.reason.decision, data.reason.summary) || row.priorityWhy,
+        priorityWhy: whyFromStudy(reason.decision, reason.summary) || row.priorityWhy,
         updatedAt: Date.now(),
       });
     } finally {

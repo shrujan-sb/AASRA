@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
     return [
       { source: "/console/ai", destination: "/console/predict", permanent: false },
       { source: "/console/ai/:path*", destination: "/console/predict/:path*", permanent: false },
+      { source: "/console/lang", destination: "/console", permanent: false },
+      { source: "/console/cascade", destination: "/console", permanent: false },
     ];
   },
 };

@@ -147,6 +147,13 @@ export function applyPublicTicket(ticket: PublicTicket, relay = true): void {
   }
 }
 
+export function mergeCloud(col: string, data: Record<string, unknown> & { id: string }): void {
+  hydrateLocal();
+  const id = data.id;
+  bucket(col)[id] = { ...bucket(col)[id], ...data, id } as Row;
+  emit(col);
+}
+
 export function getAll<T extends { id: string }>(col: string): T[] {
   return Object.values(bucket(col)) as T[];
 }
@@ -179,6 +186,24 @@ export function listen<T extends { id: string }>(col: string, cb: (rows: T[]) =>
     listeners.get(col)?.delete(run);
     unsubFs?.();
   };
+}
+
+export async function syncFromFirestore(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const rest = await import("@/lib/firestoreRest");
+  const cols = ["incidents", "events", "inbox", "agentLogs", "sitrep", "hazards", "assignments"] as const;
+  for (const col of cols) {
+    const rows = await rest.listFirestoreCol(col);
+    if (!rows.length) continue;
+    hydrateLocal();
+    for (const row of rows) {
+      const id = String(row.id ?? "");
+      if (!id) continue;
+      bucket(col)[id] = { ...row, id } as Row;
+    }
+    emit(col);
+  }
+  persist();
 }
 
 export function nid(prefix: string): string {
