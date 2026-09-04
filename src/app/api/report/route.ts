@@ -4,6 +4,8 @@ import { reasonFromStudy, studyReport } from "@/lib/featherless";
 import { rankNearestSupport } from "@/lib/nearest";
 import type { ApprovedSupport } from "@/lib/types";
 
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   const body = (await req.json()) as {
     location?: string;

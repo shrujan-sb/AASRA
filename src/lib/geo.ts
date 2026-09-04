@@ -43,8 +43,42 @@ export const ROADS: Road[] = [
   { id: "GNT", name: "Guntur–Mangalagiri road", from: "W21", to: "W15" },
 ];
 
+const WARD_LL: Record<string, { lat: number; lng: number }> = {
+  W3: { lat: 16.4982, lng: 80.6184 },
+  W4: { lat: 16.4891, lng: 80.6048 },
+  W5: { lat: 16.4814, lng: 80.642 },
+  W7: { lat: 16.5186, lng: 80.6302 },
+  W8: { lat: 16.511, lng: 80.615 },
+  W9: { lat: 16.506, lng: 80.666 },
+  W11: { lat: 16.532, lng: 80.605 },
+  W12: { lat: 16.528, lng: 80.628 },
+  W14: { lat: 16.52, lng: 80.678 },
+  W15: { lat: 16.47, lng: 80.61 },
+  W17: { lat: 16.2428, lng: 80.6405 },
+  W19: { lat: 16.487, lng: 80.666 },
+  W21: { lat: 16.3067, lng: 80.4365 },
+  HOSP: { lat: 16.5174, lng: 80.6481 },
+  "SH-B": { lat: 16.505, lng: 80.625 },
+  "SH-C": { lat: 16.235, lng: 80.655 },
+  SUB: { lat: 16.525, lng: 80.652 },
+};
+
 export function wardById(id: string): Ward {
-  return WARDS.find((w) => w.id === id) ?? WARDS[0];
+  return WARDS.find((w) => w.id === id) ?? WARDS[0]!;
+}
+
+export function wardLatLng(id: string): { lat: number; lng: number } {
+  if (WARD_LL[id]) return WARD_LL[id]!;
+  const w = wardById(id);
+  return {
+    lat: 16.58 - (w.y / 90) * 0.34,
+    lng: 80.4 + (w.x / 90) * 0.46,
+  };
+}
+
+export function incidentLatLng(row: { lat?: number; lng?: number; locationId: string }): { lat: number; lng: number } {
+  if (typeof row.lat === "number" && typeof row.lng === "number") return { lat: row.lat, lng: row.lng };
+  return wardLatLng(row.locationId);
 }
 
 export function travelMinutes(fromId: string, toId: string, blocked: Set<string>): number {

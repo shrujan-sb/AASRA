@@ -72,8 +72,8 @@ function parseJsonObject(raw: string): Record<string, unknown> | null {
   }
 }
 
-function wantsThinking(model: string): boolean {
-  return /Qwen3/i.test(model);
+function wantsThinking(_model: string): boolean {
+  return false;
 }
 
 function messageText(msg: {
@@ -91,48 +91,60 @@ async function complete(
   model: string,
   key: string,
   user: string,
-  signal: AbortSignal,
   maxTokens = 1400,
 ): Promise<{ text: string; model: string } | null> {
-  const thinking = wantsThinking(model);
-  const res = await fetch("https://api.featherless.ai/v1/chat/completions", {
-    method: "POST",
-    signal,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-      "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "https://aasra.vercel.app",
-      "X-Title": "Aasra ReliefMesh",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.15,
-      max_tokens: maxTokens,
-      ...(thinking ? { chat_template_kwargs: { enable_thinking: true, thinking: true } } : {}),
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: user },
-      ],
-    }),
-  });
-  if (!res.ok) return null;
-  const data = (await res.json()) as {
-    choices?: {
-      message?: {
-        content?: string | null;
-        reasoning_content?: string | null;
-        reasoning?: string | null;
-      };
-    }[];
-  };
-  const content = messageText(data.choices?.[0]?.message);
-  if (!content.trim()) return null;
-  return { text: content, model };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 16000);
+  try {
+    const thinking = wantsThinking(model);
+    const res = await fetch("https://api.featherless.ai/v1/chat/completions", {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "https://aasra.vercel.app",
+        "X-Title": "Aasra ReliefMesh",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.15,
+        max_tokens: maxTokens,
+        ...(thinking ? { chat_template_kwargs: { enable_thinking: true, thinking: true } } : {}),
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error("featherless", model, res.status, errText.slice(0, 240));
+      return null;
+    }
+    const data = (await res.json()) as {
+      choices?: {
+        message?: {
+          content?: string | null;
+          reasoning_content?: string | null;
+          reasoning?: string | null;
+        };
+      }[];
+    };
+    const content = messageText(data.choices?.[0]?.message);
+    if (!content.trim()) return null;
+    return { text: content, model };
+  } catch (err) {
+    console.error("featherless fail", model, err);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function brainRaw(
   user: string,
-  timeoutMs = 22000,
+  _timeoutMs = 22000,
   maxTokens = 1400,
 ): Promise<{ json: Record<string, unknown>; model: string } | null> {
   const key = process.env.FEATHERLESS_API_KEY;
@@ -140,23 +152,39 @@ export async function brainRaw(
     console.error("featherless: FEATHERLESS_API_KEY missing");
     return null;
   }
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    for (const model of FALLBACK_MODELS) {
-      try {
-        const hit = await complete(model, key, user, ctrl.signal, maxTokens);
-        if (!hit) continue;
-        const json = parseJsonObject(hit.text);
-        if (json) return { json, model: hit.model };
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  } finally {
-    clearTimeout(timer);
+  for (const model of FALLBACK_MODELS) {
+    const hit = await complete(model, key, user, maxTokens);
+    if (!hit) continue;
+    const json = parseJsonObject(hit.text);
+    if (json) return { json, model: hit.model };
   }
+  return null;
+}
+
+function heuristicStudy(input: {
+  location: string;
+  need: string;
+  heuristicSeverity: Severity;
+  heuristicScore: number;
+  resource: string;
+}): ReportStudy {
+  const text = `${input.need} ${input.location}`.toLowerCase();
+  const critical = /trap|rooftop|drown|evac|now|ambulance|collapse/.test(text);
+  const high = /medic|hospital|nurse|fever|injur/.test(text);
+  const severity: Severity = critical ? "critical" : high ? "high" : input.heuristicSeverity;
+  const summary = `Desk read: ${input.need} at ${input.location}. Ranked ${severity} (score ${input.heuristicScore}) for ${input.resource}. Clerk API was unreachable, so this is the on-duty heuristic until Featherless answers.`;
+  return {
+    summary,
+    risks: severity === "critical" ? ["Life-safety window"] : ["Need may grow if ignored"],
+    actions: ["Confirm the pin", "Match a capable unit"],
+    confidence: 0.35,
+    decision: `Heuristic ${severity} at ${input.location}.`,
+    model: "heuristic-fallback",
+    severity,
+    priorityScore: input.heuristicScore,
+    resource: input.resource,
+    title: `${input.resource} · ${input.location}`,
+  };
 }
 
 export async function studyReport(input: {
@@ -187,13 +215,13 @@ ${desks || "(none on file)"}`,
     22000,
     2000,
   );
-  if (!hit) return null;
+  if (!hit) return heuristicStudy(input);
   const j = hit.json;
   const severity = j.severity;
   const sev: Severity | undefined =
     severity === "critical" || severity === "high" || severity === "normal" ? severity : undefined;
   const summary = String(j.summary ?? j.decision ?? "").trim();
-  if (!summary) return null;
+  if (!summary) return heuristicStudy(input);
   return {
     summary,
     risks: Array.isArray(j.risks) ? j.risks.map(String).slice(0, 5) : [],
