@@ -1,0 +1,113 @@
+export type EventType = "request" | "offer" | "hazard_report";
+export type PipelineStage = "received" | "structured" | "verified" | "prioritized" | "assigned";
+export type VerificationTag = "verified" | "uncertain" | "conflicting";
+export type Severity = "critical" | "high" | "normal";
+export type ResourceKind = "team" | "vehicle" | "medical" | "supply";
+export type ResourceStatus = "free" | "assigned" | "en_route" | "committed";
+export type Lang = "en" | "hi" | "te";
+
+export type StructuredEvent = {
+  id: string;
+  type: EventType;
+  locationId: string;
+  locationLabel: string;
+  resource: string;
+  quantity: number;
+  urgencySignal: number;
+  rawText: string;
+  timestamp: number;
+  source: string;
+  sourceReliability: number;
+  language: Lang;
+  translated: string;
+  subjectKey: string;
+  hazardStatus?: "open" | "blocked" | "unknown";
+  verification: VerificationTag;
+  corroboration: number;
+  stage: PipelineStage;
+  incidentId?: string;
+  assignmentId?: string;
+};
+
+export type InboxMessage = {
+  id: string;
+  rawText: string;
+  source: string;
+  timestamp: number;
+  languageHint?: Lang;
+  processed: boolean;
+};
+
+export type Incident = {
+  id: string;
+  eventId: string;
+  type: EventType;
+  title: string;
+  locationId: string;
+  locationLabel: string;
+  resource: string;
+  quantity: number;
+  severity: Severity;
+  priorityScore: number;
+  rank: number;
+  verification: VerificationTag;
+  status: "open" | "assigned" | "rerouted" | "resolved";
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type ResourceAsset = {
+  id: string;
+  callsign: string;
+  kind: ResourceKind;
+  skills: string[];
+  equipment: string[];
+  locationId: string;
+  status: ResourceStatus;
+  assignedIncidentId?: string;
+  notes?: string;
+};
+
+export type Assignment = {
+  id: string;
+  incidentId: string;
+  resourceId: string;
+  reason: string;
+  etaMin: number;
+  viaRoadIds: string[];
+  status: "active" | "rerouted" | "cancelled";
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type Hazard = {
+  id: string;
+  roadId: string;
+  label: string;
+  status: "open" | "blocked";
+  verification: VerificationTag;
+  updatedAt: number;
+  sourceEventId: string;
+};
+
+export type Sitrep = {
+  id: "current";
+  generatedAt: number;
+  activeIncidents: number;
+  critical: number;
+  high: number;
+  roadsBlocked: number;
+  freeUnits: number;
+  assignedUnits: number;
+  headline: string;
+  predictions: string[];
+  tick: number;
+};
+
+export type AgentLog = {
+  id: string;
+  agent: "intake" | "verification" | "prioritization" | "routing" | "summary";
+  at: number;
+  message: string;
+  refId?: string;
+};
