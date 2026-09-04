@@ -1,64 +1,62 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
 export default function LoginPage() {
   const { session, ready, firebaseReady, signInGoogle, signInDuty } = useAuth();
   const router = useRouter();
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     if (ready && session) router.replace("/console");
   }, [ready, session, router]);
 
   if (!ready) {
-    return <div className="p-4 text-[12px] text-[var(--muted)]">BOOTING SECTOR DESK…</div>;
+    return <div className="p-10 text-xl">Opening the desk…</div>;
   }
 
   return (
-    <main className="min-h-full flex items-stretch">
-      <section className="w-[420px] max-w-full border-r border-[var(--line)] bg-[var(--bg-2)] p-6 flex flex-col gap-6">
-        <header className="flex items-center gap-3 border-b border-[var(--line)] pb-4">
+    <main className="min-h-full grid md:grid-cols-[1.1fr_0.9fr]">
+      <section className="flex flex-col justify-between p-10 md:p-16 border-b md:border-b-0 md:border-r border-[var(--rule)]">
+        <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/mark.png" alt="Aasra" className="h-14 w-14 object-contain" />
-          <div>
-            <div className="display text-xl tracking-[0.18em] text-[#8ec4e8]">AASRA</div>
-            <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--muted)]">ReliefMesh · sector control</div>
-          </div>
-        </header>
-        <div className="text-[11px] leading-5 text-[var(--muted)]">
-          Restricted operations console. Authenticate as Disaster Control Officer.
-          Pipeline writes incidents, events, resources, and assignments to Firestore when configured.
-        </div>
-        <button
-          type="button"
-          onClick={() => void signInGoogle().catch(() => undefined)}
-          disabled={!firebaseReady}
-          className="h-10 border border-[var(--info)] text-[var(--info)] px-3 text-left text-[12px] uppercase tracking-widest hover:bg-[#12324a] disabled:opacity-40"
-        >
-          Google sign-in — duty officer
-        </button>
-        {!firebaseReady && (
-          <p className="text-[10px] text-[var(--high)]">
-            Firebase env vars missing. Add keys in .env.local. Local duty desk is available for the demo.
+          <img src="/brand/mark.png" alt="Aasra" className="h-20 w-20 object-contain mix-blend-multiply" />
+          <p className="mt-10 text-lg text-[var(--mute)]">Krishna basin flood desk</p>
+          <h1 className="mt-3 text-5xl md:text-7xl font-semibold leading-[0.95] tracking-tight">
+            Sign in to
+            <br />
+            run the <span className="mark text-[var(--crit)] text-6xl md:text-8xl align-baseline">live</span> sector.
+          </h1>
+          <p className="mt-8 max-w-md text-lg text-[var(--mute)]">
+            Duty officers only. Incoming requests, offers, and road reports get parsed, verified, ranked, and assigned in this room.
           </p>
-        )}
-        <button
-          type="button"
-          onClick={signInDuty}
-          className="h-9 border border-[var(--line)] px-3 text-left text-[11px] uppercase tracking-widest text-[var(--muted)] hover:text-[var(--text)]"
-        >
-          Assume local duty desk
-        </button>
-        <div className="mt-auto text-[10px] text-[var(--muted)]">
-          PREPARE · RESPOND · REBUILD
-          <div>Krishna basin flood sector · demo stream</div>
+        </div>
+        <div className="mt-12 flex flex-col gap-4 max-w-md">
+          <button
+            type="button"
+            disabled={!firebaseReady}
+            onClick={() =>
+              void signInGoogle().catch((e: unknown) => setErr(e instanceof Error ? e.message : "Google sign-in failed"))
+            }
+            className="h-14 bg-[var(--ink)] text-[var(--paper)] px-6 text-lg font-medium disabled:opacity-40"
+          >
+            Continue with Google
+          </button>
+          <button type="button" onClick={signInDuty} className="h-14 border-2 border-[var(--ink)] px-6 text-lg font-medium">
+            Open local duty desk
+          </button>
+          {!firebaseReady && (
+            <p className="text-base text-[var(--warn)]">Firebase keys are not loaded. Use the local desk for the demo.</p>
+          )}
+          {err && <p className="text-base text-[var(--crit)]">{err}</p>}
+          <p className="text-base text-[var(--mute)]">Prepare · Respond · Rebuild</p>
         </div>
       </section>
-      <section className="flex-1 hidden md:flex items-center justify-center">
+      <section className="bg-[var(--paper-2)] flex items-center justify-center p-10 min-h-[40vh]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/logo.png" alt="Aasra mark" className="max-h-[70vh] object-contain opacity-90" />
+        <img src="/brand/logo.png" alt="Aasra" className="max-h-[72vh] w-auto object-contain" />
       </section>
     </main>
   );
