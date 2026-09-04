@@ -24,7 +24,10 @@ export function AllocateBoard() {
             const inc = incidents.find((i) => i.id === a?.incidentId);
             const pool = r.status === "free" ? "FREE" : r.status === "assigned" ? "COMMITTED" : r.status.toUpperCase();
             return (
-              <tr key={r.id} className="border-t border-[var(--line)] bg-[var(--panel)] flash-in">
+              <tr
+                key={r.id}
+                className={`border-t border-[var(--line)] bg-[var(--panel)] flash-in ${a?.status === "rerouted" ? "text-[var(--high)]" : ""}`}
+              >
                 <td className="px-2 py-2">{r.callsign}</td>
                 <td>{r.kind}</td>
                 <td className={r.status === "free" ? "text-[var(--ok)]" : "text-[var(--high)]"}>{pool}</td>
