@@ -5,9 +5,9 @@ import { VerificationAgent } from "@/lib/agents/verification";
 import { PrioritizationAgent } from "@/lib/agents/prioritization";
 import { RoutingAgent } from "@/lib/agents/routing";
 import { SummaryAgent } from "@/lib/agents/summary";
-import { getAll, hydrateLocal, nid, upsert } from "@/lib/db";
+import { getAll, hydrateLocal, nid, upsert, clearAll } from "@/lib/db";
 import { SEED_RESOURCES } from "@/lib/seed";
-import { FEED_SCRIPT, toInbox } from "@/lib/sim/messages";
+import { DRIP_POOL, FEED_SCRIPT, toInbox } from "@/lib/sim/messages";
 import type {
   AgentLog,
   Assignment,
@@ -117,19 +117,42 @@ export async function ensureSeeded() {
 export function startLiveFeed() {
   if (started || typeof window === "undefined") return;
   started = true;
-  const t0 = Date.now();
   void ensureSeeded().then(() => {
-    for (const row of FEED_SCRIPT) {
-      window.setTimeout(() => {
-        void ingestMessage(toInbox(row, Date.now()));
-      }, row.delayMs);
+    const already = getAll<InboxMessage>("inbox").length > 0;
+    if (!already) {
+      for (const row of FEED_SCRIPT) {
+        window.setTimeout(() => {
+          void ingestMessage(toInbox(row, Date.now()));
+        }, row.delayMs);
+      }
     }
+    window.setTimeout(
+      () => {
+        window.setInterval(() => {
+          const row = DRIP_POOL[Math.floor(Math.random() * DRIP_POOL.length)]!;
+          void ingestMessage(toInbox(row, Date.now()));
+        }, 8000);
+      },
+      already ? 2000 : 65000,
+    );
   });
-  return t0;
+}
+
+export async function injectRoadBlock(road = "NH-16") {
+  await ingestMessage({
+    id: nid("IN"),
+    rawText: `${road} corridor blocked at Autonagar underpass, trucks cannot pass`,
+    source: "Duty officer inject",
+    timestamp: Date.now(),
+    processed: false,
+  });
 }
 
 export function resetSession() {
   started = false;
-  if (typeof window !== "undefined") localStorage.removeItem("aasra-ops-v1");
-  window.location.reload();
+  tick = 0;
+  if (typeof window !== "undefined") {
+    clearAll();
+    window.location.reload();
+  }
 }
