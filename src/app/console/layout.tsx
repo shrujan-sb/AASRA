@@ -14,7 +14,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }, [ready, session, router]);
 
   if (!ready || !session) {
-    return <div className="p-3 text-[11px] text-[var(--muted)]">AUTH GATE…</div>;
+    return <div className="p-10 text-xl">Checking duty pass…</div>;
   }
 
   return <Shell>{children}</Shell>;
