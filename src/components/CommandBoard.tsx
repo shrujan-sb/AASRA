@@ -12,7 +12,8 @@ function Stat({ k, v, tone }: { k: string; v: number | string; tone?: string }) 
 }
 
 export function CommandBoard() {
-  const { incidents, resources, sitrep, assignments, logs } = useOps();
+  const { incidents, resources, sitrep, assignments, logs, events } = useOps();
+  const offers = events.filter((e) => e.type === "offer").slice(0, 8);
   return (
     <div className="h-full grid grid-rows-[auto_1fr] gap-2 p-2">
       <div className="flex flex-wrap gap-2">
@@ -75,6 +76,14 @@ export function CommandBoard() {
                 <span className="text-[var(--muted)]"> · {r.locationId}</span>
               </span>
               <span className={r.status === "free" ? "text-[var(--ok)]" : "text-[var(--high)]"}>{r.status}</span>
+            </div>
+          ))}
+          <h2 className="display sticky top-0 bg-[var(--panel)] px-2 py-1 text-[11px] tracking-[0.18em] border-y border-[var(--line)] mt-2">
+            INBOUND OFFERS
+          </h2>
+          {offers.map((o) => (
+            <div key={o.id} className="px-2 py-1 text-[10px] border-b border-[var(--line)]">
+              {o.quantity} {o.resource} · {o.locationId} · {o.source}
             </div>
           ))}
         </section>
