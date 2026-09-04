@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #07090c;
+  --bg-2: #0c1014;
+  --panel: #10161c;
+  --panel-2: #151c23;
+  --line: #24303a;
+  --text: #d5ddd8;
+  --muted: #7d8b86;
+  --crit: #e23d2d;
+  --high: #e8941a;
+  --ok: #3d9b6e;
+  --info: #3a8fd4;
+  --warn: #c9a227;
+  --accent: #f07a22;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-crit: var(--crit);
+  --color-high: var(--high);
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --font-display: var(--font-oxanium);
+  --font-data: var(--font-ibm);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-ibm), ui-monospace, monospace;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-oxanium), sans-serif;
+}
+
+.console-grid {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(58, 143, 212, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(58, 143, 212, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.flash-in {
+  animation: flashRow 1.1s ease-out;
+}
+
+@keyframes flashRow {
+  from { background: rgba(240, 122, 34, 0.22); }
+  to { background: transparent; }
+}
+
+.sev-critical { color: var(--crit); }
+.sev-high { color: var(--high); }
+.sev-normal { color: var(--ok); }
+
+.tag-verified { color: var(--ok); }
+.tag-uncertain { color: var(--warn); }
+.tag-conflicting { color: var(--crit); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #2a3842; }
+::-webkit-scrollbar-track { background: #0b0f12; }
