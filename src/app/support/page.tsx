@@ -13,13 +13,16 @@ import { rankNearestSupport } from "@/lib/nearest";
 import { buildCandidates } from "@/lib/dispatch";
 import type { ApprovedSupport, Incident } from "@/lib/types";
 
+type Filter = "all" | "routed" | "mine";
+
 export default function SupportPage() {
   const { session, ready, logout } = useAuth();
   const router = useRouter();
-  const { incidents, resources, hazards } = useOps();
+  const { incidents, resources, hazards, sitrep } = useOps();
   const [units, setUnits] = useState<ApprovedSupport[]>([]);
   const [busyId, setBusyId] = useState("");
   const [err, setErr] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
     if (ready && (!session || session.role !== "support")) router.replace("/");
@@ -38,14 +41,26 @@ export default function SupportPage() {
 
   const rows = useMemo(() => {
     const open = incidents.filter((i) => i.status !== "resolved");
-    if (me?.lat == null || me.lng == null) return open;
-    return [...open].sort((a, b) => dist(me, a) - dist(me, b));
-  }, [incidents, me]);
+    const sorted =
+      me?.lat == null || me.lng == null ? open : [...open].sort((a, b) => dist(me, a) - dist(me, b));
+    if (!session) return sorted;
+    if (filter === "routed") {
+      return sorted.filter((i) => i.nearest?.some((n) => n.email.toLowerCase() === session.email.toLowerCase()));
+    }
+    if (filter === "mine") {
+      return sorted.filter((i) => i.helper?.email.toLowerCase() === session.email.toLowerCase());
+    }
+    return sorted;
+  }, [incidents, me, filter, session]);
 
   if (!ready || session?.role !== "support") return <BootScreen label="Opening your field desk" />;
 
   const org = me?.orgName || me?.name || session.name;
   const kindLabel = me?.kind === "government" ? "Government desk" : "NGO / volunteer desk";
+  const helping = incidents.filter((i) => i.helper?.email.toLowerCase() === session.email.toLowerCase()).length;
+  const routed = incidents.filter((i) => i.nearest?.some((n) => n.email.toLowerCase() === session.email.toLowerCase())).length;
+  const openCount = incidents.filter((i) => i.status !== "resolved").length;
+  const blocked = hazards.filter((h) => h.status === "blocked");
 
   async function help(row: Incident) {
     if (!session) return;
@@ -109,11 +124,44 @@ export default function SupportPage() {
           <div className="font-semibold">{org}</div>
           <div className="mt-1 text-[var(--mute)]">{session.email}</div>
           {me?.areaLabel && <div className="mt-2">{me.areaLabel}</div>}
+          <div className="mt-3 space-y-1">
+            <div className="flex justify-between">
+              <span className="text-[var(--mute)]">Open</span>
+              <span className="tabular-nums font-semibold">{openCount}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--mute)]">Routed to you</span>
+              <span className="tabular-nums font-semibold">{routed}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--mute)]">You are helping</span>
+              <span className="tabular-nums font-semibold">{helping}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--mute)]">Roads blocked</span>
+              <span className={`tabular-nums font-semibold ${blocked.length ? "text-[var(--crit)]" : ""}`}>
+                {blocked.length}
+              </span>
+            </div>
+          </div>
+          {sitrep?.headline && <p className="mt-3 text-[12px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>}
         </div>
+        {blocked.length > 0 && (
+          <div className="px-4 py-3 border-b border-[var(--rule)] text-[13px]">
+            <p className="text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">Ground</p>
+            <ul className="mt-2 space-y-1">
+              {blocked.slice(0, 5).map((h) => (
+                <li key={h.id}>{h.label}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="mt-auto border-t border-[var(--ink)] px-4 py-3 text-[13px]">
+          <p className="text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">Field desk</p>
+          <p className="mt-1 text-[var(--mute)]">Help claims one ticket. The clerk can still hold it.</p>
           <button
             type="button"
-            className="text-[var(--mute)]"
+            className="mt-3 text-[var(--mute)]"
             onClick={() => {
               void logout().then(() => router.replace("/"));
             }}
@@ -122,32 +170,60 @@ export default function SupportPage() {
           </button>
         </div>
       </aside>
-      <div className="ops-main overflow-auto">
-        <header className="px-5 py-4 border-b border-[var(--ink)]">
+      <div className="ops-main overflow-auto bg-[var(--paper)]">
+        <header className="sticky top-0 z-10 bg-[var(--paper)] px-5 py-4 border-b border-[var(--ink)]">
           <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Nearest first</p>
           <h1 className="mt-1 text-[26px] font-semibold leading-none">Your tickets</h1>
           <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
             Reports closest to your area show first. Press Help to take it. After that, everyone sees who is on it.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(
+              [
+                ["all", "All open"],
+                ["routed", "Routed to you"],
+                ["mine", "You are helping"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setFilter(id)}
+                className={`h-9 px-3 border border-[var(--ink)] text-[13px] ${
+                  filter === id ? "bg-[var(--ink)] text-white" : "bg-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {err && <p className="mt-2 text-[var(--crit)]">{err}</p>}
         </header>
-        <ul>
+        <ul className="p-5 space-y-3">
           {rows.map((i) => {
             const km = me?.lat != null && me.lng != null ? dist(me, i) : undefined;
-            const routed = i.nearest?.some((n) => n.email.toLowerCase() === session.email.toLowerCase());
+            const routedToMe = i.nearest?.some((n) => n.email.toLowerCase() === session.email.toLowerCase());
             const taken = Boolean(i.helper);
             const mine = i.helper?.email.toLowerCase() === session.email.toLowerCase();
+            const slip =
+              i.severity === "critical" ? "field-slip field-slip-crit" : i.severity === "high" ? "field-slip field-slip-high" : "field-slip";
             return (
-              <li key={i.id} className="px-5 py-4 border-b border-[var(--rule)]">
+              <li key={i.id} className={`${slip} px-5 py-4`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold">{i.title}</div>
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <div className="font-semibold">{i.title}</div>
+                      <span className="text-[12px] uppercase tracking-wide text-[var(--mute)]">{i.resource}</span>
+                    </div>
                     <div className="mt-1 text-[13px] text-[var(--mute)]">
                       {i.locationLabel}
                       {typeof km === "number" && Number.isFinite(km) ? ` · ${km} km from you` : ""}
-                      {routed ? " · routed to you" : ""}
+                      {routedToMe ? " · routed to you" : ""}
                     </div>
                     {i.reason?.summary && <p className="mt-2 text-[14px] leading-relaxed">{i.reason.summary}</p>}
+                    {i.reason?.actions && i.reason.actions.length > 0 && (
+                      <p className="mt-2 text-[13px] text-[var(--mute)]">First move: {i.reason.actions[0]}</p>
+                    )}
                     {i.aiPick && (
                       <p className="mt-2 text-[13px] text-[var(--mute)]">Desk pick: {i.aiPick.reason}</p>
                     )}
@@ -163,7 +239,18 @@ export default function SupportPage() {
                     )}
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="text-[12px] uppercase tracking-wide text-[var(--mute)]">{i.severity}</div>
+                    <div
+                      className={`text-[12px] uppercase tracking-wide ${
+                        i.severity === "critical"
+                          ? "text-[var(--crit)]"
+                          : i.severity === "high"
+                            ? "text-[var(--warn)]"
+                            : "text-[var(--mute)]"
+                      }`}
+                    >
+                      {i.severity}
+                    </div>
+                    <div className="mt-1 tabular-nums text-[13px] text-[var(--mute)]">score {i.priorityScore}</div>
                     {!taken ? (
                       <button
                         type="button"
@@ -182,7 +269,15 @@ export default function SupportPage() {
             );
           })}
         </ul>
-        {rows.length === 0 && <p className="px-5 py-6 text-[var(--mute)]">No open tickets yet.</p>}
+        {rows.length === 0 && (
+          <p className="px-5 pb-8 text-[var(--mute)]">
+            {filter === "mine"
+              ? "You are not on a ticket yet. Open All and press Help on the nearest one."
+              : filter === "routed"
+                ? "Nothing routed to your desk right now. Check All open."
+                : "No open tickets yet."}
+          </p>
+        )}
       </div>
     </div>
   );

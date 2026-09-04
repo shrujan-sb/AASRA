@@ -15,7 +15,7 @@ export function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--ink)] bg-[#f3f1ec]">
+    <header className="sticky top-0 z-40 border-b border-[var(--ink)] bg-[var(--paper)]">
       <div className="site-wrap flex h-[72px] items-center gap-8">
         <Link href="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setOpen(false)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -51,7 +51,7 @@ export function Header() {
         </button>
       </div>
       {open && (
-        <div className="md:hidden border-t border-[var(--rule)] bg-[#f3f1ec]">
+        <div className="md:hidden border-t border-[var(--rule)] bg-[var(--paper)]">
           <div className="site-wrap flex flex-col gap-1 py-4">
             {LINKS.map((l) => (
               <Link key={l.href} href={l.href} className="py-2" onClick={() => setOpen(false)}>
