@@ -90,7 +90,8 @@ export default function GovernmentApply() {
           <p className="mt-6 text-[13px] tracking-[0.2em] uppercase text-[var(--mute)]">File 01</p>
           <h1 className="mt-2 text-[32px] font-semibold tracking-tight">Government official</h1>
           <p className="mt-3 text-[16px] leading-relaxed text-[var(--mute)]">
-            Photograph the government card. Name the posting. This is the same desk that later sees Help on a ticket.
+            Photograph the government card. Pick your posting from the five suggestions. Nearby reports show as recommended
+            on the government desk.
           </p>
           <ol className="mt-6 space-y-2 text-[14px] text-[var(--mute)]">
             <li>01 · Name, work Gmail, department</li>
@@ -122,7 +123,7 @@ export default function GovernmentApply() {
               <span className="text-[13px] text-[var(--mute)]">02</span>
             </div>
             <div className="px-5 py-4">
-              <label className="block text-[14px] text-[var(--mute)]">Mandal, town, or landmark</label>
+              <label className="block text-[14px] text-[var(--mute)]">Mandal, town, or landmark — pick one of five</label>
               <PlaceSuggest
                 value={area}
                 onChange={(label, nextLat, nextLng) => {
@@ -130,8 +131,9 @@ export default function GovernmentApply() {
                   setLat(nextLat);
                   setLng(nextLng);
                 }}
-                placeholder="Type your mandal, town, or landmark"
+                placeholder="Start typing — street, mandal, landmark…"
               />
+              <p className="mt-2 text-[13px] text-[var(--mute)]">Reports nearest this pin show as recommended on the government desk.</p>
             </div>
           </section>
 

@@ -94,8 +94,8 @@ export default function ReportPage() {
         <p className="text-[13px] tracking-[0.18em] uppercase text-[var(--mute)]">Public intake</p>
         <h1 className="mt-3 max-w-[18ch] text-[32px] font-semibold tracking-tight">Report help</h1>
         <p className="mt-2 max-w-[52ch] text-[16px] leading-relaxed text-[var(--mute)]">
-          Type a place and choose from the list, or drop a pin. Name is optional. Demo report files a fake ticket and
-          jumps the map.
+          Type a place and choose from the five names, or drop a pin. Name is optional. Send is instant — the clerk
+          studies it in the background.
         </p>
 
         <div className="mt-10 grid items-start gap-10 lg:grid-cols-12">
@@ -119,12 +119,12 @@ export default function ReportPage() {
             />
 
             <button type="submit" disabled={busy} className="site-btn site-btn-ink mt-6 w-full disabled:opacity-50">
-              {busy ? "Studying the report…" : "Send to desk"}
+            {busy ? "Sending…" : "Send to desk"}
             </button>
             <button type="button" disabled={busy} onClick={() => void demo()} className="site-btn site-btn-paper mt-2 w-full disabled:opacity-50">
               Demo report
             </button>
-            {sent && <p className="mt-3 text-[var(--ok)]">Clerk has the ticket. Open Needs, or wait for the nearest desk.</p>}
+            {sent && <p className="mt-3 text-[var(--ok)]">Desk has the ticket. The nearest team sees it as recommended.</p>}
             {err && <p className="mt-3 text-[var(--crit)]">{err}</p>}
           </div>
 

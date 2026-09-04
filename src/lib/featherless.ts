@@ -248,7 +248,7 @@ export async function clerkApplication(row: SupportApplication): Promise<Applica
     `Review this support application. Decide allow or hold. Return JSON:
 {"allow":true|false,"summary":"2 sentences on why","flags":["missing field or risk"],"confidence":0-1}
 
-Allow only if the file looks like a real government or NGO/volunteer posting with name, email, area, and an ID or registration number. Hold if fields are thin, contradictory, or look like a joke. You cannot see the photo; judge the text.
+Allow only if the file looks like a real government, NGO, or volunteer posting with name, email, area, and an ID or registration number. Hold if fields are thin, contradictory, or look like a joke. You cannot see the photo; judge the text.
 
 Kind: ${row.kind}
 Name: ${row.name}

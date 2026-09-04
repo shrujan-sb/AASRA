@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { approveSupport, listenApplications } from "@/lib/support";
 import { upsert } from "@/lib/db";
+import { parseSupportKind, supportKindLabel } from "@/lib/supportKind";
 import type { SupportApplication } from "@/lib/types";
 
 export function ApprovalsBoard() {
@@ -57,7 +58,7 @@ export function ApprovalsBoard() {
             <p className="ops-kicker">Gate</p>
             <h1>Approvals</h1>
             <p className="mt-1.5 max-w-[62ch] text-[13px] text-[var(--mute)]">
-              Government and NGO chits. The clerk reads the file first. You can still override.
+              Government, NGO, and volunteer chits. The clerk reads the file first. You can still override.
             </p>
           </div>
           <span className="ops-chip ops-chip-high">{pending.length} pending</span>
@@ -74,7 +75,7 @@ export function ApprovalsBoard() {
               <div>
                 <p className="font-semibold leading-snug">{r.name}</p>
                 <p className="mt-0.5 text-[12px] text-[var(--mute)]">
-                  {r.kind === "government" ? "Government" : "NGO / volunteer"}
+                  {supportKindLabel(parseSupportKind(r.kind))}
                 </p>
               </div>
               {r.clerk && (

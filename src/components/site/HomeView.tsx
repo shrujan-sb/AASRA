@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Site } from "@/components/site/Site";
 import { useAuth } from "@/lib/auth";
+import { supportDeskPath } from "@/lib/supportKind";
 import type { BeforeBrief } from "@/lib/types";
 
 export function HomeView() {
@@ -16,7 +17,7 @@ export function HomeView() {
   useEffect(() => {
     if (!ready || !session || busy) return;
     if (session.role === "admin" && firebaseReady && session.mode !== "firebase") return;
-    router.replace(session.role === "support" ? "/support" : "/console");
+    router.replace(session.role === "support" ? supportDeskPath(session.supportKind ?? "ngo") : "/console");
   }, [ready, session, router, busy, firebaseReady]);
 
   async function enterAdmin() {
@@ -171,7 +172,7 @@ export function HomeView() {
               {
                 k: "Field",
                 t: "ID, then the same Gmail",
-                d: "Support team is two tracks: government official, or NGO / volunteer. You name the area you cover. An admin — and the clerk — read the file. Mail comes from aasra.support@gmail.com. Then use I am already approved.",
+                d: "Support team is three desks: government, NGO, and volunteer. You pick where you are from (five suggestions). After approval you only see your desk. Reports nearest you say recommended. Take initiative once — then everyone sees your name.",
               },
               {
                 k: "Command",

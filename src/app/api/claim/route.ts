@@ -1,57 +1,55 @@
 import { NextResponse } from "next/server";
-import { clerkClaim } from "@/lib/featherless";
-import type { DispatchCandidate, Incident, IncidentHelper, IncidentNear, Severity } from "@/lib/types";
+import type { Incident, IncidentHelper } from "@/lib/types";
+import { parseSupportKind } from "@/lib/supportKind";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
-    incident?: Pick<Incident, "id" | "title" | "locationLabel" | "severity" | "nearest" | "helper" | "resource" | "aiPick">;
+    incident?: Pick<Incident, "id" | "helper">;
     helper?: IncidentHelper;
-    km?: number;
-    candidates?: DispatchCandidate[];
   };
   const incident = body.incident;
   const helper = body.helper;
   if (!incident?.id || !helper?.email) {
     return NextResponse.json({ ok: false, error: "Missing ticket or unit." }, { status: 400 });
   }
-  if (incident.helper) {
+
+  const who: IncidentHelper = {
+    ...helper,
+    kind: parseSupportKind(helper.kind),
+    email: helper.email.trim().toLowerCase(),
+    at: helper.at || Date.now(),
+  };
+
+  const rest = await import("@/lib/firestoreRest");
+  const existing = await rest.getFirestoreDoc("incidents", incident.id);
+  const currentHelper = existing?.helper as IncidentHelper | undefined;
+  if (currentHelper?.email && currentHelper.email.toLowerCase() !== who.email) {
     return NextResponse.json({
       ok: true,
       allow: false,
-      summary: `${incident.helper.orgName} are already helping them.`,
+      taken: true,
+      summary: `${currentHelper.name} took the initiative.`,
+    });
+  }
+  if (incident.helper && incident.helper.email.toLowerCase() !== who.email) {
+    return NextResponse.json({
+      ok: true,
+      allow: false,
+      taken: true,
+      summary: `${incident.helper.name} took the initiative.`,
     });
   }
 
-  const clerk = await clerkClaim({
-    title: incident.title,
-    location: incident.locationLabel,
-    severity: (["critical", "high", "normal"].includes(incident.severity) ? incident.severity : "normal") as Severity,
-    resource: incident.resource,
-    nearest: incident.nearest as IncidentNear[] | undefined,
-    helperName: helper.name,
-    helperOrg: helper.orgName,
-    helperKind: helper.kind,
-    helperEmail: helper.email,
-    helperKm: typeof body.km === "number" ? body.km : undefined,
-    aiPick: incident.aiPick?.reason,
-    candidates: body.candidates?.map((c) => ({
-      callsign: c.callsign,
-      etaMin: c.etaMin,
-      fit: c.fit,
-      equipment: c.equipment,
-      available: c.available,
-    })),
+  void rest.createFirestoreDoc("incidents", incident.id, {
+    helper: who,
+    status: "assigned",
+    updatedAt: Date.now(),
   });
-
-  if (!clerk) {
-    return NextResponse.json({ ok: true, allow: true, summary: "Clerk offline — take it if you can move.", studied: false });
-  }
 
   return NextResponse.json({
     ok: true,
-    allow: clerk.allow,
-    summary: clerk.summary,
-    confidence: clerk.confidence,
-    studied: true,
+    allow: true,
+    taken: false,
+    summary: `${who.name} took the initiative.`,
   });
 }

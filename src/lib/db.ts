@@ -119,11 +119,7 @@ export function applyApplication(row: SupportApplication, relay = true): void {
 
 export function applyPublicTicket(ticket: PublicTicket, relay = true): void {
   hydrateLocal();
-  if (
-    typeof ticket.incident.lat === "number" &&
-    typeof ticket.incident.lng === "number" &&
-    !(ticket.incident.nearest && ticket.incident.nearest.length)
-  ) {
+  if (typeof ticket.incident.lat === "number" && typeof ticket.incident.lng === "number") {
     ticket.incident.nearest = rankNearestSupport(
       getAll<ApprovedSupport>("approvedSupport"),
       ticket.incident.lat,

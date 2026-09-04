@@ -5,7 +5,7 @@ export type Severity = "critical" | "high" | "normal";
 export type ResourceKind = "team" | "vehicle" | "medical" | "supply";
 export type ResourceStatus = "free" | "assigned" | "en_route" | "committed";
 export type Lang = "en" | "hi" | "te";
-export type SupportKind = "government" | "ngo";
+export type SupportKind = "government" | "ngo" | "volunteer";
 export type ApplicationStatus = "pending" | "allowed" | "rejected";
 
 export type StructuredEvent = {

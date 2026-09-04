@@ -26,7 +26,7 @@ const STEPS = [
   {
     n: "04",
     t: "Routing",
-    d: "Nearest approved government, NGO, or volunteer from their registered area. Help claims the ticket; the clerk can hold a bad claim.",
+    d: "Nearest approved government, NGO, or volunteer from their registered area. Take initiative claims the ticket; everyone else sees the name.",
   },
   {
     n: "05",

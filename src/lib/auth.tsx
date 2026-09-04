@@ -4,7 +4,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { firebaseEnabled, getFirebaseAuth, googleProvider } from "@/lib/firebase";
 import { ensureSeedAdmin, isAdminEmail, SEED_ADMIN } from "@/lib/admins";
-import { checkApprovedSupport } from "@/lib/support";
+import { loadApprovedSupport } from "@/lib/support";
+import type { SupportKind } from "@/lib/types";
 
 export type Role = "admin" | "support";
 
@@ -15,6 +16,7 @@ export type Session = {
   photo?: string;
   mode: "firebase" | "local";
   role: Role;
+  supportKind?: SupportKind;
 };
 
 type AuthCtx = {
@@ -31,7 +33,7 @@ const Ctx = createContext<AuthCtx | null>(null);
 const SESSION_KEY = "aasra-session";
 const ROLE_KEY = "aasra-role-intent";
 
-function withRole(user: User, role: Role): Session {
+function withRole(user: User, role: Role, supportKind?: SupportKind): Session {
   return {
     uid: user.uid,
     name: user.displayName ?? (role === "admin" ? "Admin" : "Support"),
@@ -39,6 +41,7 @@ function withRole(user: User, role: Role): Session {
     photo: user.photoURL ?? undefined,
     mode: "firebase",
     role,
+    supportKind,
   };
 }
 
@@ -69,15 +72,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setReady(true);
               return;
             }
-            if (role === "support" && !(await checkApprovedSupport(user.email))) {
-              await signOut(auth);
-              localStorage.removeItem(SESSION_KEY);
-              setSession(null);
-              setAuthError("You aren't approved as support yet. Submit an application first.");
-              setReady(true);
-              return;
+            let supportKind: SupportKind | undefined;
+            if (role === "support") {
+              const profile = await loadApprovedSupport(user.email);
+              if (!profile) {
+                await signOut(auth);
+                localStorage.removeItem(SESSION_KEY);
+                setSession(null);
+                setAuthError("You aren't approved as support yet. Submit an application first.");
+                setReady(true);
+                return;
+              }
+              supportKind = profile.kind;
             }
-            const next = withRole(user, role);
+            const next = withRole(user, role, supportKind);
             localStorage.setItem(SESSION_KEY, JSON.stringify(next));
             setSession(next);
           } else {
@@ -114,15 +122,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setAuthError(msg);
           throw new Error(msg);
         }
-        if (role === "support" && !(await checkApprovedSupport(cred.user.email))) {
-          await signOut(auth);
-          localStorage.removeItem(SESSION_KEY);
-          setSession(null);
-          const msg = "You aren't approved as support yet. Submit an application first.";
-          setAuthError(msg);
-          throw new Error(msg);
+        let supportKind: SupportKind | undefined;
+        if (role === "support") {
+          const profile = await loadApprovedSupport(cred.user.email);
+          if (!profile) {
+            await signOut(auth);
+            localStorage.removeItem(SESSION_KEY);
+            setSession(null);
+            const msg = "You aren't approved as support yet. Submit an application first.";
+            setAuthError(msg);
+            throw new Error(msg);
+          }
+          supportKind = profile.kind;
         }
-        const next = withRole(cred.user, role);
+        const next = withRole(cred.user, role, supportKind);
         localStorage.setItem(SESSION_KEY, JSON.stringify(next));
         setSession(next);
       },

@@ -2,9 +2,64 @@ import { NextResponse } from "next/server";
 import { buildPublicReport } from "@/lib/buildPublicReport";
 import { reasonFromStudy, studyReport } from "@/lib/featherless";
 import { rankNearestSupport } from "@/lib/nearest";
+import { parseSupportKind } from "@/lib/supportKind";
 import type { ApprovedSupport } from "@/lib/types";
 
 export const maxDuration = 60;
+
+function mapUnits(rows: Record<string, unknown>[]): ApprovedSupport[] {
+  return rows.map((r) => ({
+    id: String(r.id ?? r.email ?? ""),
+    email: String(r.email ?? r.id ?? "").toLowerCase(),
+    kind: parseSupportKind(r.kind),
+    name: typeof r.name === "string" ? r.name : undefined,
+    orgName: typeof r.orgName === "string" ? r.orgName : undefined,
+    areaLabel: typeof r.areaLabel === "string" ? r.areaLabel : undefined,
+    lat: typeof r.lat === "number" ? r.lat : undefined,
+    lng: typeof r.lng === "number" ? r.lng : undefined,
+  }));
+}
+
+async function enrichTicket(
+  payload: Awaited<ReturnType<typeof buildPublicReport>>,
+  location: string,
+  need: string,
+  name?: string,
+) {
+  const rest = await import("@/lib/firestoreRest");
+  if (typeof payload.incident.lat === "number" && typeof payload.incident.lng === "number") {
+    const units = mapUnits(await rest.listFirestoreCol("approvedSupport").catch(() => []));
+    payload.incident.nearest = rankNearestSupport(units, payload.incident.lat, payload.incident.lng);
+  }
+  const study = await studyReport({
+    location,
+    need,
+    name,
+    heuristicSeverity: payload.incident.severity,
+    heuristicScore: payload.incident.priorityScore,
+    resource: payload.incident.resource,
+    nearest: payload.incident.nearest,
+  });
+  if (study) {
+    payload.incident.reason = reasonFromStudy(study);
+    if (study.severity) payload.incident.severity = study.severity;
+    if (typeof study.priorityScore === "number") {
+      payload.incident.priorityScore = Math.max(0, Math.min(250, study.priorityScore));
+    }
+    if (study.resource) payload.incident.resource = study.resource;
+    if (typeof study.quantity === "number") payload.incident.quantity = study.quantity;
+    if (study.title) payload.incident.title = study.title;
+    if (study.verification) payload.incident.verification = study.verification;
+    payload.incident.updatedAt = Date.now();
+    payload.log.message = `Clerk decided ${payload.incident.severity} ${payload.incident.priorityScore} @ ${payload.incident.locationLabel}`;
+  }
+  await Promise.all([
+    rest.createFirestoreDoc("inbox", payload.inbox.id, payload.inbox as unknown as Record<string, unknown>),
+    rest.createFirestoreDoc("events", payload.event.id, payload.event as unknown as Record<string, unknown>),
+    rest.createFirestoreDoc("incidents", payload.incident.id, payload.incident as unknown as Record<string, unknown>),
+    rest.createFirestoreDoc("agentLogs", payload.log.id, payload.log as unknown as Record<string, unknown>),
+  ]);
+}
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
@@ -28,74 +83,14 @@ export async function POST(req: Request) {
     lng: typeof body.lng === "number" ? body.lng : undefined,
   });
 
-  let units: ApprovedSupport[] = [];
-  if (typeof ticket.incident.lat === "number" && typeof ticket.incident.lng === "number") {
-    const rows = await import("@/lib/firestoreRest")
-      .then((m) => m.listFirestoreCol("approvedSupport"))
-      .catch(() => [] as Record<string, unknown>[]);
-    units = rows.map((r) => ({
-      id: String(r.id ?? r.email ?? ""),
-      email: String(r.email ?? r.id ?? ""),
-      kind: r.kind === "government" ? "government" : "ngo",
-      name: typeof r.name === "string" ? r.name : undefined,
-      orgName: typeof r.orgName === "string" ? r.orgName : undefined,
-      lat: typeof r.lat === "number" ? r.lat : undefined,
-      lng: typeof r.lng === "number" ? r.lng : undefined,
-    })) satisfies ApprovedSupport[];
-    ticket.incident.nearest = rankNearestSupport(units, ticket.incident.lat, ticket.incident.lng);
-  }
-
-  const study = await studyReport({
-    location,
-    need,
-    name: body.name,
-    heuristicSeverity: ticket.incident.severity,
-    heuristicScore: ticket.incident.priorityScore,
-    resource: ticket.incident.resource,
-    nearest: ticket.incident.nearest,
-  });
-
-  if (study) {
-    ticket.incident.reason = reasonFromStudy(study);
-    if (study.severity) ticket.incident.severity = study.severity;
-    if (typeof study.priorityScore === "number") {
-      ticket.incident.priorityScore = Math.max(0, Math.min(250, study.priorityScore));
-    }
-    if (study.resource) ticket.incident.resource = study.resource;
-    if (typeof study.quantity === "number") ticket.incident.quantity = study.quantity;
-    if (study.title) ticket.incident.title = study.title;
-    if (study.verification) ticket.incident.verification = study.verification;
-    if (study.routeEmails?.length && ticket.incident.nearest?.length) {
-      const order = new Map(study.routeEmails.map((e, i) => [e.toLowerCase(), i]));
-      ticket.incident.nearest = [...ticket.incident.nearest].sort((a, b) => {
-        const ia = order.has(a.email.toLowerCase()) ? order.get(a.email.toLowerCase())! : 99;
-        const ib = order.has(b.email.toLowerCase()) ? order.get(b.email.toLowerCase())! : 99;
-        return ia - ib || a.km - b.km;
-      });
-    }
-    ticket.incident.updatedAt = Date.now();
-    ticket.log.agent = "summary";
-    ticket.log.message = `Clerk decided ${ticket.incident.severity} ${ticket.incident.priorityScore} @ ${ticket.incident.locationLabel}${study.decision ? ` — ${study.decision}` : ""}`;
-  }
-
   const payload = JSON.parse(JSON.stringify(ticket)) as typeof ticket;
-
-  void import("@/lib/firestoreRest")
-    .then((m) =>
-      Promise.all([
-        m.createFirestoreDoc("inbox", payload.inbox.id, payload.inbox as unknown as Record<string, unknown>),
-        m.createFirestoreDoc("events", payload.event.id, payload.event as unknown as Record<string, unknown>),
-        m.createFirestoreDoc("incidents", payload.incident.id, payload.incident as unknown as Record<string, unknown>),
-        m.createFirestoreDoc("agentLogs", payload.log.id, payload.log as unknown as Record<string, unknown>),
-      ]),
-    )
-    .catch(() => undefined);
+  void enrichTicket(payload, location, need, body.name).catch(() => undefined);
 
   return NextResponse.json({
     ok: true,
     id: payload.inbox.id,
     incidentId: payload.incident.id,
-    studied: Boolean(study),
+    studied: false,
     ticket: payload,
   });
 }

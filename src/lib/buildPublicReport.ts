@@ -30,7 +30,7 @@ export async function buildPublicReport(input: PublicReportInput): Promise<{
     timestamp: Date.now(),
     processed: true,
   };
-  const parsed = await IntakeAgent.runAsync(inbox);
+  const parsed = IntakeAgent.run(inbox);
   const v = VerificationAgent.run({ incoming: parsed, corpus: [] });
   const event: StructuredEvent = {
     ...parsed,

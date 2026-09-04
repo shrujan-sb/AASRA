@@ -36,11 +36,11 @@ export default function JoinPage() {
         <p className="text-[13px] tracking-[0.2em] uppercase text-[var(--mute)]">Application desk</p>
         <h1 className="mt-3 max-w-[16ch] text-[36px] font-semibold tracking-tight">Support team</h1>
         <p className="mt-3 max-w-[58ch] text-[17px] leading-relaxed text-[var(--mute)]">
-          Two files. Pick the one that matches your posting. Photograph the card, name the area you cover, wait for the
-          stamp. After a pass, sign in with that same Gmail.
+          Three files. Government, NGO, or volunteer. Photograph the card, pick where you are from (top five suggestions),
+          wait for the stamp. After a pass you land on your own desk.
         </p>
 
-        <div className="mt-10 grid gap-4 lg:grid-cols-2">
+        <div className="mt-10 grid gap-4 lg:grid-cols-3">
           <Link href="/join/government" className="desk-file block hover:bg-[var(--paper)]">
             <div className="desk-file-head">
               <span className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">File 01</span>
@@ -49,7 +49,7 @@ export default function JoinPage() {
             <div className="px-5 py-5">
               <h2 className="text-[22px] font-semibold">Government officials</h2>
               <p className="mt-2 text-[15px] leading-relaxed text-[var(--mute)]">
-                Department, designation, employee number, posting area from the five suggestions.
+                Department, designation, posting area from the five suggestions. Own dashboard after approval.
               </p>
               <p className="mt-5 text-[14px] font-medium">Open this file →</p>
             </div>
@@ -58,12 +58,26 @@ export default function JoinPage() {
           <Link href="/join/ngo" className="desk-file block hover:bg-[var(--paper)]">
             <div className="desk-file-head">
               <span className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">File 02</span>
-              <span className="text-[13px] text-[var(--mute)]">Org letter or volunteer card</span>
+              <span className="text-[13px] text-[var(--mute)]">Org letter</span>
             </div>
             <div className="px-5 py-5">
-              <h2 className="text-[22px] font-semibold">NGOs and volunteers</h2>
+              <h2 className="text-[22px] font-semibold">NGOs</h2>
               <p className="mt-2 text-[15px] leading-relaxed text-[var(--mute)]">
-                Organisation name, role, registration, the mandal or town you cover, why you are deploying.
+                Organisation name, registration, the mandal or town you cover. NGO desk after approval.
+              </p>
+              <p className="mt-5 text-[14px] font-medium">Open this file →</p>
+            </div>
+          </Link>
+
+          <Link href="/join/volunteer" className="desk-file block hover:bg-[var(--paper)]">
+            <div className="desk-file-head">
+              <span className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">File 03</span>
+              <span className="text-[13px] text-[var(--mute)]">Volunteer card</span>
+            </div>
+            <div className="px-5 py-5">
+              <h2 className="text-[22px] font-semibold">Volunteers</h2>
+              <p className="mt-2 text-[15px] leading-relaxed text-[var(--mute)]">
+                Where you are from, what you can do. Volunteer desk after approval.
               </p>
               <p className="mt-5 text-[14px] font-medium">Open this file →</p>
             </div>

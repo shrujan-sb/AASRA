@@ -37,7 +37,7 @@ export function PlaceSuggest({ value, onChange, placeholder, required = true }: 
         setActive(0);
         setOpen(true);
       });
-    }, 160);
+    }, 80);
     return () => window.clearTimeout(t);
   }, [value]);
 

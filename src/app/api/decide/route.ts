@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendAasraMail, SITE } from "@/lib/mail";
+import { parseSupportKind, supportKindLabel } from "@/lib/supportKind";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
   if (!email) return NextResponse.json({ ok: false, error: "No applicant email." }, { status: 400 });
 
   const allowed = Boolean(body.allowed);
-  const kindLabel = kind === "government" ? "government" : "NGO / volunteer";
+  const kindLabel = supportKindLabel(parseSupportKind(kind)).toLowerCase();
 
   try {
     const mailed = await sendAasraMail(
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
       void import("@/lib/firestoreRest").then((m) =>
         m.createFirestoreDoc("approvedSupport", email, {
           email,
-          kind: kind === "government" ? "government" : "ngo",
+          kind: parseSupportKind(kind),
           name,
           orgName: body.orgName || name,
           areaLabel: body.areaLabel,

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { collection, doc, getDocs, getFirestore, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, getFirestore, setDoc } from "firebase/firestore";
 
 function apiApp(): FirebaseApp | null {
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -23,16 +23,32 @@ function apiApp(): FirebaseApp | null {
 export async function createFirestoreDoc(col: string, id: string, data: Record<string, unknown>): Promise<boolean> {
   const app = apiApp();
   if (!app) return false;
-    try {
-      const done = Promise.race([
-        setDoc(doc(getFirestore(app), col, id), { ...JSON.parse(JSON.stringify({ ...data, id })) }, { merge: true }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 4000)),
-      ]);
-      await done;
-      return true;
+  try {
+    const done = Promise.race([
+      setDoc(doc(getFirestore(app), col, id), { ...JSON.parse(JSON.stringify({ ...data, id })) }, { merge: true }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 2500)),
+    ]);
+    await done;
+    return true;
   } catch (err) {
     console.error("firestore write", col, id, err);
     return false;
+  }
+}
+
+export async function getFirestoreDoc(col: string, id: string): Promise<Record<string, unknown> | null> {
+  const app = apiApp();
+  if (!app) return null;
+  try {
+    const snap = await Promise.race([
+      getDoc(doc(getFirestore(app), col, id)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 2500)),
+    ]);
+    if (!snap.exists()) return null;
+    return { ...(snap.data() as Record<string, unknown>), id: snap.id };
+  } catch (err) {
+    console.error("firestore get", col, id, err);
+    return null;
   }
 }
 
@@ -42,7 +58,7 @@ export async function listFirestoreCol(col: string): Promise<Record<string, unkn
   try {
     const snap = await Promise.race([
       getDocs(collection(getFirestore(app), col)),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 4000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("firestore timeout")), 2500)),
     ]);
     return snap.docs.map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id }));
   } catch (err) {
