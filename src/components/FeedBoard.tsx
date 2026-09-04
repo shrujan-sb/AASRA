@@ -2,54 +2,62 @@
 
 import { useOps } from "@/lib/useOps";
 
+const STAGES = ["received", "structured", "verified", "prioritized", "assigned"] as const;
+
 export function FeedBoard() {
   const { inbox, events } = useOps();
   return (
-    <div className="h-full grid grid-cols-1 md:grid-cols-2 gap-2 p-2">
-      <section className="border border-[var(--line)] bg-[var(--panel)] overflow-auto">
-        <h2 className="display sticky top-0 bg-[var(--panel)] px-2 py-1 text-[11px] tracking-[0.18em] border-b border-[var(--line)]">
-          RAW INTAKE
+    <div className="h-full overflow-auto px-6 md:px-10 py-8 grid md:grid-cols-2 gap-12">
+      <section>
+        <h2 className="text-4xl font-semibold">
+          Raw <span className="mark text-6xl text-[var(--crit)]">intake</span>
         </h2>
-        {inbox.map((m) => (
-          <article key={m.id} className="px-2 py-2 border-b border-[var(--line)] flash-in">
-            <div className="text-[10px] text-[var(--muted)]">
-              {new Date(m.timestamp).toLocaleTimeString()} · {m.source}
-            </div>
-            <div className="text-[12px] mt-1">{m.rawText}</div>
-          </article>
-        ))}
+        <ul className="mt-6 divide-y-2 divide-[var(--rule)]">
+          {inbox.map((m) => (
+            <li key={m.id} className="py-5 flash-in">
+              <div className="text-base text-[var(--mute)]">
+                {new Date(m.timestamp).toLocaleTimeString()} · {m.source}
+              </div>
+              <p className="mt-2 text-2xl leading-snug">{m.rawText}</p>
+            </li>
+          ))}
+        </ul>
       </section>
-      <section className="border border-[var(--line)] bg-[var(--panel)] overflow-auto">
-        <h2 className="display sticky top-0 bg-[var(--panel)] px-2 py-1 text-[11px] tracking-[0.18em] border-b border-[var(--line)]">
-          STRUCTURED / VERIFIED
+      <section>
+        <h2 className="text-4xl font-semibold">
+          Made <span className="mark text-6xl">structured</span>
         </h2>
-        {events.map((e) => (
-          <article key={e.id} className="px-2 py-2 border-b border-[var(--line)] flash-in text-[11px]">
-            <div className="flex gap-2 flex-wrap items-center">
-              <span className="text-[var(--info)]">{e.type}</span>
-              <span className={`tag-${e.verification}`}>{e.verification}</span>
-              <span className="tracking-widest text-[9px]">
-                <span className="text-[var(--ok)]">RECV</span>
-                <span className="text-[var(--muted)]">→</span>
-                <span className="text-[var(--ok)]">STRUCT</span>
-                <span className="text-[var(--muted)]">→</span>
-                <span className={e.verification === "conflicting" ? "text-[var(--crit)]" : "text-[var(--ok)]"}>VRF</span>
-                <span className="text-[var(--muted)]">→</span>
-                <span className={["prioritized", "assigned"].includes(e.stage) ? "text-[var(--ok)]" : "text-[var(--muted)]"}>PRI</span>
-                <span className="text-[var(--muted)]">→</span>
-                <span className={e.stage === "assigned" ? "text-[var(--accent)]" : "text-[var(--muted)]"}>ASN</span>
-              </span>
-              <span>{e.locationId}</span>
-              <span>
-                {e.quantity} {e.resource}
-              </span>
-            </div>
-            <div className="text-[var(--muted)] mt-1">{e.translated}</div>
-            <div className="text-[10px] text-[var(--muted)]">
-              src {e.source} · rel {e.sourceReliability} · n={e.corroboration}
-            </div>
-          </article>
-        ))}
+        <ul className="mt-6 divide-y-2 divide-[var(--rule)]">
+          {events.map((e) => (
+            <li key={e.id} className="py-5 flash-in">
+              <div className="flex flex-wrap items-baseline gap-3 text-lg">
+                <span className="font-semibold">{e.type}</span>
+                <span className={`mark text-3xl ${e.verification === "conflicting" ? "text-[var(--crit)]" : e.verification === "verified" ? "text-[var(--ok)]" : "text-[var(--warn)]"}`}>
+                  {e.verification}
+                </span>
+                <span>
+                  {e.quantity} {e.resource} · {e.locationId}
+                </span>
+              </div>
+              <p className="mt-2 text-xl leading-snug">{e.translated}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-base">
+                {STAGES.map((s, idx) => {
+                  const current =
+                    e.stage === "assigned" ? 4 : e.stage === "prioritized" ? 3 : 2;
+                  const on = idx <= current;
+                  return (
+                    <span
+                      key={s}
+                      className={`px-3 py-1 border-2 border-[var(--rule)] ${on ? "bg-[var(--ink)] text-[var(--paper)]" : "text-[var(--mute)]"}`}
+                    >
+                      {s}
+                    </span>
+                  );
+                })}
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   );
