@@ -1,4 +1,5 @@
 import type { InboxMessage, Lang, StructuredEvent } from "@/lib/types";
+import { offerSubjectKey } from "@/lib/agents/offers";
 import { ROADS, WARDS } from "@/lib/geo";
 
 const RESOURCE_MAP: { keys: string[]; resource: string }[] = [
@@ -16,12 +17,13 @@ const RESOURCE_MAP: { keys: string[]; resource: string }[] = [
 ];
 
 export type IntakeClerk = {
-  type: "request" | "hazard_report";
+  type: StructuredEvent["type"];
   locationId: string;
   locationLabel: string;
   resource: string;
-  quantity: number;
+  quantity?: number;
   hazardStatus?: StructuredEvent["hazardStatus"];
+  language?: Lang;
   translated?: string;
 };
 
@@ -138,11 +140,21 @@ function resolveLocation(id: string, label: string): { id: string; label: string
 
 function applyClerk(base: IntakeOutput, clerk: IntakeClerk | null): IntakeOutput {
   if (!clerk) return base;
-  const loc = resolveLocation(clerk.locationId, clerk.locationLabel);
+  const loc =
+    clerk.locationLabel.trim() || clerk.locationId.trim()
+      ? resolveLocation(clerk.locationId, clerk.locationLabel)
+      : { id: base.locationId, label: base.locationLabel };
   const resource = clerk.resource.trim() || base.resource;
-  const type: StructuredEvent["type"] = clerk.type === "hazard_report" ? "hazard_report" : "request";
-  const qty = Number.isFinite(clerk.quantity) ? Math.max(1, Math.min(10000, Math.round(clerk.quantity))) : base.quantity;
+  const type: StructuredEvent["type"] =
+    clerk.type === "offer" || clerk.type === "hazard_report" || clerk.type === "request" ? clerk.type : base.type;
+  const qty =
+    typeof clerk.quantity === "number" && clerk.quantity > 0
+      ? Math.max(1, Math.min(10000, Math.round(clerk.quantity)))
+      : base.quantity;
   const text = clerk.translated?.trim() || base.translated;
+  const language = clerk.language ?? base.language;
+  const key =
+    type === "offer" ? offerSubjectKey(loc.id, resource) : subjectKey(base.rawText, loc.id, resource);
   return {
     ...base,
     type,
@@ -150,62 +162,30 @@ function applyClerk(base: IntakeOutput, clerk: IntakeClerk | null): IntakeOutput
     locationLabel: loc.label,
     resource,
     quantity: qty,
+    language,
     translated: text,
-    subjectKey: subjectKey(base.rawText, loc.id, resource),
+    subjectKey: key,
     hazardStatus: type === "hazard_report" ? clerk.hazardStatus ?? hazardStatus(base.rawText) : undefined,
   };
 }
 
-function placesCatalog() {
-  const wards = WARDS.map((w) => `${w.id} = ${w.name}`).join("; ");
-  const roads = ROADS.map((r) => `${r.id} = ${r.name}`).join("; ");
-  return `Wards/sites: ${wards}. Roads: ${roads}.`;
-}
-
-async function parseNeedHazard(msg: IntakeInput): Promise<IntakeClerk | null> {
-  const { brainRaw } = await import("@/lib/featherless");
-  const hit = await brainRaw(
-    `Parse this messy NEED or HAZARD field message into one structured event. Offers of trucks/staff are out of scope — if the text is clearly an offer, still classify the need/hazard only if one is present, else type request with resource unspecified aid.
-Return JSON:
-{"type":"request"|"hazard_report","locationId":"known id or LOC-slug","locationLabel":"short place name","resource":"short noun (medicine, access, flood-rescue team, water tankers, ...)","quantity":number,"hazardStatus":"open"|"blocked"|"unknown"|null,"translated":"English one-liner"}
-
-Rules:
-- request = people need aid (medicine, food, water, rescue, people stuck/stranded).
-- hazard_report = road/bridge/access blocked, open, collapsed, restored. resource is usually "access".
-- Never return type offer.
-- Map place to a known ward/site/road id when possible. "near school" → LOC-school / School. "near bridge" / barrage → W3 / Prakasam barrage or road PRAKASAM.
-- quantity: people count if stuck; else units of the resource; default 1.
-- hazardStatus only for hazard_report.
-
-${placesCatalog()}
-
-Source: ${msg.source}
-Text: ${msg.rawText}`,
-    16000,
-    700,
-  );
-  if (!hit) return null;
-  const j = hit.json;
-  const type = j.type === "hazard_report" ? "hazard_report" : j.type === "request" ? "request" : null;
-  const locationLabel = String(j.locationLabel ?? "").trim();
-  const locationId = String(j.locationId ?? "").trim();
-  const resource = String(j.resource ?? "").trim();
-  if (!type || !locationLabel || !resource) return null;
-  const clerk: IntakeClerk = {
-    type,
-    locationId: locationId || `LOC-${locationLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,
-    locationLabel,
-    resource,
-    quantity: typeof j.quantity === "number" ? j.quantity : 1,
-    translated: typeof j.translated === "string" ? j.translated : undefined,
-  };
-  if (type === "hazard_report") {
-    clerk.hazardStatus =
-      j.hazardStatus === "open" || j.hazardStatus === "blocked" || j.hazardStatus === "unknown"
-        ? j.hazardStatus
-        : "unknown";
+async function parseChaotic(msg: IntakeInput): Promise<IntakeClerk | null> {
+  const { parseChaoticIntake, detectAndTranslate } = await import("@/lib/featherless");
+  const clerk = await parseChaoticIntake({ rawText: msg.rawText, source: msg.source });
+  if (clerk) {
+    const { model: _model, ...rest } = clerk;
+    return rest;
   }
-  return clerk;
+  const lang = await detectAndTranslate(msg.rawText);
+  if (!lang) return null;
+  return {
+    type: typeOf(msg.rawText),
+    locationId: "",
+    locationLabel: "",
+    resource: "",
+    language: lang.language,
+    translated: lang.translated,
+  };
 }
 
 export type IntakeInput = InboxMessage;
@@ -232,11 +212,9 @@ export const IntakeAgent = {
       source: msg.source,
       sourceReliability: /control|ndrf|police|municipal/i.test(msg.source) ? 0.92 : 0.55,
       language,
-      translated:
-        language === "en"
-          ? msg.rawText
-          : `[${language.toUpperCase()}→EN] ${msg.rawText}`,
-      subjectKey: subjectKey(msg.rawText, loc.id, resource),
+      translated: msg.rawText,
+      subjectKey:
+        kind === "offer" ? offerSubjectKey(loc.id, resource) : subjectKey(msg.rawText, loc.id, resource),
       hazardStatus: kind === "hazard_report" ? hazardStatus(msg.rawText) : undefined,
     };
     this.memory.set(out.id, out);
@@ -244,7 +222,6 @@ export const IntakeAgent = {
   },
   async runAsync(msg: IntakeInput): Promise<IntakeOutput> {
     const fallback = this.run(msg);
-    if (fallback.type === "offer") return fallback;
     if (typeof window !== "undefined") {
       try {
         const res = await fetch("/api/intake", {
@@ -262,7 +239,7 @@ export const IntakeAgent = {
       }
       return fallback;
     }
-    const clerk = await parseNeedHazard(msg);
+    const clerk = await parseChaotic(msg);
     const out = applyClerk(fallback, clerk);
     this.memory.set(out.id, out);
     return out;

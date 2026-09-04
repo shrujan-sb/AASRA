@@ -65,25 +65,24 @@ export function CommandBoard() {
   }
 
   return (
-    <div className="h-full min-h-0 grid grid-rows-[auto_1fr] lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)] lg:grid-rows-none">
+    <div className="h-full min-h-0 grid grid-rows-[auto_1fr] lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] lg:grid-rows-none">
       <section className="min-h-0 overflow-auto border-b lg:border-b-0 lg:border-r border-[var(--ink)]">
-        <header className="sticky top-0 z-10 bg-white px-5 py-4 border-b border-[var(--ink)]">
+        <header className="ops-head">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Krishna delta · sitrep</p>
-              <h1 className="mt-1 text-[26px] font-semibold leading-none">Needs board</h1>
+              <p className="ops-kicker">Krishna delta · sitrep</p>
+              <h1>Needs board</h1>
               {sitrep?.headline ? (
-                <p className="mt-2 max-w-[36rem] text-[13px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>
-              ) : null}
-              {sitrep?.predictedShortage ? (
-                <p className="mt-1 max-w-[36rem] text-[13px] leading-snug">{sitrep.predictedShortage}</p>
+                <p className="mt-2 max-w-[40rem] text-[13px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>
               ) : null}
             </div>
-            <div className="flex gap-5 text-[13px]">
-              <Metric n={critical} label="life" alert={critical > 0} />
-              <Metric n={high} label="urgent" />
-              <Metric n={open.filter((i) => i.severity === "normal").length} label="routine" />
-              <Metric n={resources.filter((r) => r.status !== "free").length} label="out" />
+            <div className="flex flex-wrap gap-2 justify-end">
+              <span className="ops-chip ops-chip-critical">{critical} life</span>
+              <span className="ops-chip ops-chip-high">{high} urgent</span>
+              <span className="ops-chip ops-chip-normal">
+                {open.filter((i) => i.severity === "normal").length} routine
+              </span>
+              <span className="ops-chip ops-chip-warn">{resources.filter((r) => r.status !== "free").length} out</span>
             </div>
           </div>
         </header>
@@ -93,23 +92,16 @@ export function CommandBoard() {
             const why = whyLine(i);
             return (
               <li key={i.id}>
-                <button
-                  type="button"
-                  onClick={() => setSel(i.id)}
-                  className={`w-full text-left px-5 py-3.5 border-b border-[var(--rule)] flex gap-4 items-start ${
-                    on ? "bg-[var(--paper)]" : "bg-white hover:bg-[var(--paper-2)]"
-                  }`}
-                >
-                  <span className="w-10 shrink-0 text-center">
-                    <span className="block tabular-nums font-semibold leading-none">{String(i.rank).padStart(2, "0")}</span>
-                    <span className="mt-1 block text-[10px] uppercase tracking-wide text-[var(--mute)]">AI</span>
+                <button type="button" onClick={() => setSel(i.id)} className="ops-row" data-on={on ? "true" : "false"}>
+                  <span className="tabular-nums font-semibold text-[13px] pt-0.5">
+                    {String(i.rank).padStart(2, "0")}
                   </span>
-                  <span className={`mt-1 h-3 w-3 shrink-0 ${sevDot(i.severity)}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium leading-snug">{i.title}</div>
-                    <p className="mt-1 text-[14px] leading-snug">{why}</p>
-                    <div className="mt-1 text-[13px] text-[var(--mute)] flex flex-wrap items-center gap-2">
-                      <span>{i.locationLabel}</span>
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-medium leading-snug">{i.title}</span>
+                      <span className={`ops-chip ops-chip-${i.severity}`}>
+                        {i.severity === "high" ? "urgent" : i.severity}
+                      </span>
                       <span
                         className={
                           i.verification === "verified"
@@ -121,57 +113,68 @@ export function CommandBoard() {
                       >
                         {i.verification}
                       </span>
-                      {i.reason ? <span>· studied</span> : null}
-                      {i.helper ? <span>· {i.helper.orgName}</span> : null}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className={`text-[13px] font-semibold uppercase tracking-wide ${sevColor(i.severity)}`}>
-                      {i.severity}
-                    </div>
-                    <div className="tabular-nums text-[13px] text-[var(--mute)]">score {i.priorityScore}</div>
-                  </div>
+                    </span>
+                    <p className="mt-0.5 text-[13px] leading-snug">{why}</p>
+                    <p className="mt-0.5 text-[12px] text-[var(--mute)]">
+                      {i.locationLabel}
+                      {i.reason ? " · studied" : ""}
+                      {i.helper ? ` · ${i.helper.orgName}` : ""}
+                    </p>
+                  </span>
+                  <span className="text-right shrink-0">
+                    <span className="block tabular-nums text-[13px] font-semibold">{i.priorityScore}</span>
+                    <span className="block text-[10px] uppercase tracking-wide text-[var(--mute)]">{i.status}</span>
+                  </span>
                 </button>
               </li>
             );
           })}
         </ul>
+        {incidents.length === 0 && (
+          <p className="px-5 py-6 text-[var(--mute)]">No tickets on the board. Public reports land here after the clerk studies them.</p>
+        )}
       </section>
 
       <aside className="min-h-0 overflow-auto bg-[var(--paper)]">
         {!current ? (
-          <p className="p-6 text-[var(--mute)]">No open tickets.</p>
+          <p className="p-5 text-[var(--mute)]">No open tickets.</p>
         ) : (
-          <div className="p-5">
-            <div className="ops-dossier">
+          <div className="p-4 space-y-3">
+            <div className="ops-dossier" data-sev={current.severity}>
               <div className="flex justify-between gap-3 items-start">
                 <div>
-                  <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">{current.id}</p>
-                  <h2 className="mt-1 text-[20px] font-semibold leading-tight">{current.title}</h2>
+                  <p className="ops-kicker">{current.id}</p>
+                  <h2 className="mt-1 text-[18px] font-semibold leading-tight">{current.title}</h2>
                 </div>
-                <span className={`text-[12px] font-semibold uppercase tracking-wide ${sevColor(current.severity)}`}>
-                  {current.severity}
+                <span className={`ops-chip ops-chip-${current.severity}`}>
+                  {current.severity === "high" ? "urgent" : current.severity}
                 </span>
               </div>
-              <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[13px]">
                 <div>
-                  <dt className="text-[var(--mute)]">AI rank</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-[var(--mute)]">Rank</dt>
                   <dd className="tabular-nums">{String(current.rank).padStart(2, "0")}</dd>
                 </div>
                 <div>
-                  <dt className="text-[var(--mute)]">Score</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-[var(--mute)]">Score</dt>
                   <dd className="tabular-nums">{current.priorityScore}</dd>
                 </div>
                 <div>
-                  <dt className="text-[var(--mute)]">Place</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-[var(--mute)]">Place</dt>
                   <dd>{current.locationLabel}</dd>
                 </div>
                 <div>
-                  <dt className="text-[var(--mute)]">Status</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-[var(--mute)]">Need</dt>
+                  <dd>
+                    {current.quantity} {current.resource}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] uppercase tracking-wide text-[var(--mute)]">Status</dt>
                   <dd className="capitalize">{current.status}</dd>
                 </div>
                 <div>
-                  <dt className="text-[var(--mute)]">Check</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-[var(--mute)]">Check</dt>
                   <dd>
                     <span
                       className={
@@ -187,45 +190,41 @@ export function CommandBoard() {
                   </dd>
                 </div>
                 <div className="col-span-2">
-                  <dt className="text-[var(--mute)]">Why</dt>
+                  <dt className="text-[10px] uppercase tracking-wide text-[var(--mute)]">Why</dt>
                   <dd>{whyLine(current)}</dd>
                 </div>
               </dl>
               {event && (
-                <p className="mt-4 text-[14px] leading-relaxed border-t border-[var(--rule)] pt-3">{event.rawText}</p>
+                <p className="mt-3 text-[13px] leading-relaxed border-t border-[var(--rule)] pt-2">{event.rawText}</p>
               )}
-              {match && (
-                <p className="mt-3 text-[13px]">{match.reason}</p>
-              )}
+              {match && <p className="mt-2 text-[13px]">{match.reason}</p>}
               {current.aiPick && (
-                <p className="mt-2 text-[14px] font-medium">
+                <p className="mt-2 text-[13px] font-medium">
                   Clerk pick: {current.aiPick.reason}
                   {current.aiPick.model ? ` · ${current.aiPick.model}` : ""}
                 </p>
               )}
               {current.claimNote && (
-                <p className="mt-2 text-[13px] text-[var(--mute)]">Help claim: {current.claimNote}</p>
+                <p className="mt-2 text-[12px] text-[var(--mute)]">Help claim: {current.claimNote}</p>
               )}
               {current.helper && (
-                <p className="mt-3 text-[15px] font-medium">
-                  {current.helper.orgName} are helping them right now.
-                </p>
+                <p className="mt-2 text-[14px] font-medium">{current.helper.orgName} are helping them right now.</p>
               )}
               {current.nearest && current.nearest.length > 0 && (
-                <p className="mt-2 text-[13px] text-[var(--mute)]">
+                <p className="mt-2 text-[12px] text-[var(--mute)]">
                   Nearest desks: {current.nearest.map((n) => `${n.orgName} (${n.km} km)`).join(" · ")}
                 </p>
               )}
             </div>
 
-            <div className="mt-4 ops-dossier">
+            <div className="ops-dossier" data-sev={current.reason ? current.severity : undefined}>
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-[15px] font-semibold">Clerk study</h3>
+                <h3 className="text-[14px] font-semibold">Clerk study</h3>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void restudy(current)}
-                  className="h-8 px-3 text-[13px] border border-[var(--ink)] bg-white disabled:opacity-50"
+                  className="h-8 px-3 text-[12px] border border-[var(--ink)] bg-white disabled:opacity-50"
                 >
                   {busy ? "Reading…" : current.reason ? "Restudy" : "Study now"}
                 </button>
@@ -234,13 +233,13 @@ export function CommandBoard() {
               {current.reason ? (
                 <>
                   {current.reason.decision && (
-                    <p className="mt-3 text-[15px] font-semibold">{current.reason.decision}</p>
+                    <p className="mt-2 text-[14px] font-semibold">{current.reason.decision}</p>
                   )}
-                  <p className="mt-3 text-[15px] leading-relaxed">{current.reason.summary}</p>
+                  <p className="mt-2 text-[14px] leading-relaxed">{current.reason.summary}</p>
                   {current.reason.risks.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">Risks</p>
-                      <ul className="mt-1 list-disc pl-4 text-[14px] space-y-1">
+                    <div className="mt-2">
+                      <p className="ops-kicker">Risks</p>
+                      <ul className="mt-1 list-disc pl-4 text-[13px] space-y-0.5">
                         {current.reason.risks.map((r) => (
                           <li key={r}>{r}</li>
                         ))}
@@ -248,16 +247,16 @@ export function CommandBoard() {
                     </div>
                   )}
                   {current.reason.actions.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">First moves</p>
-                      <ol className="mt-1 list-decimal pl-4 text-[14px] space-y-1">
+                    <div className="mt-2">
+                      <p className="ops-kicker">First moves</p>
+                      <ol className="mt-1 list-decimal pl-4 text-[13px] space-y-0.5">
                         {current.reason.actions.map((r) => (
                           <li key={r}>{r}</li>
                         ))}
                       </ol>
                     </div>
                   )}
-                  <p className="mt-3 text-[12px] text-[var(--mute)]">
+                  <p className="mt-2 text-[11px] text-[var(--mute)]">
                     {typeof current.reason.peopleEstimate === "number" ? `~${current.reason.peopleEstimate} people · ` : ""}
                     {typeof current.reason.confidence === "number"
                       ? `${Math.round(current.reason.confidence * 100)}% confidence · `
@@ -266,7 +265,7 @@ export function CommandBoard() {
                   </p>
                 </>
               ) : (
-                <p className="mt-3 text-[14px] text-[var(--mute)]">
+                <p className="mt-2 text-[13px] text-[var(--mute)]">
                   New tickets are studied on intake. Seed rows can be studied here.
                 </p>
               )}
@@ -303,25 +302,4 @@ function oneLine(s?: string): string {
   if (!t) return "";
   const first = t.split(/(?<=[.!?])\s/)[0] ?? t;
   return first.length > 140 ? `${first.slice(0, 137).trimEnd()}…` : first;
-}
-
-function Metric({ n, label, alert }: { n: number; label: string; alert?: boolean }) {
-  return (
-    <div className="text-right">
-      <div className={`text-[22px] font-semibold tabular-nums leading-none ${alert ? "text-[var(--crit)]" : ""}`}>{n}</div>
-      <div className="text-[11px] uppercase tracking-wide text-[var(--mute)]">{label}</div>
-    </div>
-  );
-}
-
-function sevColor(s: Incident["severity"]) {
-  if (s === "critical") return "text-[var(--crit)]";
-  if (s === "high") return "text-[var(--warn)]";
-  return "text-[var(--mute)]";
-}
-
-function sevDot(s: Incident["severity"]) {
-  if (s === "critical") return "bg-[var(--crit)]";
-  if (s === "high") return "bg-[var(--warn)]";
-  return "bg-[var(--rule)]";
 }

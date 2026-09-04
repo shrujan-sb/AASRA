@@ -58,15 +58,23 @@ export default function GovernmentApply() {
   if (done) {
     return (
       <Site>
-        <div className="site-wrap max-w-[560px] py-16">
-          <p className="text-[13px] tracking-[0.2em] uppercase text-[var(--mute)]">Application</p>
-          <h1 className="mt-3 text-[32px] font-semibold tracking-tight">Sent for review</h1>
-          <p className="mt-3 text-[16px] leading-relaxed text-[var(--mute)]">
-            An admin will look at your ID. You get mail when they decide. Then use Support team → I am already approved.
-          </p>
-          <Link href="/" className="site-btn site-btn-ink mt-8">
-            Home
-          </Link>
+        <div className="site-wrap max-w-[640px] py-16">
+          <div className="desk-file">
+            <div className="desk-file-head">
+              <span className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">Receipt</span>
+              <span className="text-[13px] text-[var(--ok)]">Filed</span>
+            </div>
+            <div className="px-5 py-8">
+              <p className="text-[13px] tracking-[0.2em] uppercase text-[var(--mute)]">Application desk</p>
+              <h1 className="mt-3 text-[32px] font-semibold tracking-tight">Sent for review</h1>
+              <p className="mt-3 text-[16px] leading-relaxed text-[var(--mute)]">
+                An admin will look at your ID. Mail comes when they decide. Then Support team → I am already approved.
+              </p>
+              <Link href="/" className="site-btn site-btn-ink mt-8">
+                Home
+              </Link>
+            </div>
+          </div>
         </div>
       </Site>
     );
@@ -74,47 +82,85 @@ export default function GovernmentApply() {
 
   return (
     <Site>
-      <form onSubmit={(e) => void submit(e)} className="site-wrap max-w-[560px] py-12">
-        <Link href="/join" className="text-[14px] text-[var(--mute)]">
-          Support team
-        </Link>
-        <h1 className="mt-4 text-[32px] font-semibold tracking-tight">Government official</h1>
-        <p className="mt-2 text-[16px] text-[var(--mute)]">Photo of your government ID is required.</p>
+      <form onSubmit={(e) => void submit(e)} className="site-wrap grid items-start gap-10 py-12 lg:grid-cols-12">
+        <div className="lg:col-span-4 lg:sticky lg:top-24">
+          <Link href="/join" className="text-[14px] text-[var(--mute)]">
+            ← Application desk
+          </Link>
+          <p className="mt-6 text-[13px] tracking-[0.2em] uppercase text-[var(--mute)]">File 01</p>
+          <h1 className="mt-2 text-[32px] font-semibold tracking-tight">Government official</h1>
+          <p className="mt-3 text-[16px] leading-relaxed text-[var(--mute)]">
+            Photograph the government card. Name the posting. This is the same desk that later sees Help on a ticket.
+          </p>
+          <ol className="mt-6 space-y-2 text-[14px] text-[var(--mute)]">
+            <li>01 · Name, work Gmail, department</li>
+            <li>02 · Area you are posted — pick from the list</li>
+            <li>03 · ID card photo</li>
+          </ol>
+        </div>
 
-        <Field label="Full name" value={name} onChange={setName} required />
-        <Field label="Work Gmail" value={email} onChange={setEmail} type="email" required />
-        <Field label="Department" value={department} onChange={setDepartment} required />
-        <Field label="Designation" value={designation} onChange={setDesignation} required />
-        <Field label="ID / employee number" value={idNumber} onChange={setIdNumber} required />
+        <div className="lg:col-span-8">
+          <section className="desk-file">
+            <div className="desk-file-head">
+              <span className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">Identity</span>
+              <span className="text-[13px] text-[var(--mute)]">01</span>
+            </div>
+            <div className="grid gap-x-4 px-5 py-4 sm:grid-cols-2">
+              <Field label="Full name" value={name} onChange={setName} required />
+              <Field label="Work Gmail" value={email} onChange={setEmail} type="email" required />
+              <Field label="Department" value={department} onChange={setDepartment} required />
+              <Field label="Designation" value={designation} onChange={setDesignation} required />
+              <div className="sm:col-span-2">
+                <Field label="ID / employee number" value={idNumber} onChange={setIdNumber} required />
+              </div>
+            </div>
+          </section>
 
-        <label className="mt-4 block text-[14px] text-[var(--mute)]">Area you are posted</label>
-        <PlaceSuggest
-          value={area}
-          onChange={(label, nextLat, nextLng) => {
-            setArea(label);
-            setLat(nextLat);
-            setLng(nextLng);
-          }}
-          placeholder="Type your mandal, town, or landmark"
-        />
+          <section className="desk-file mt-4">
+            <div className="desk-file-head">
+              <span className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">Area you are posted</span>
+              <span className="text-[13px] text-[var(--mute)]">02</span>
+            </div>
+            <div className="px-5 py-4">
+              <label className="block text-[14px] text-[var(--mute)]">Mandal, town, or landmark</label>
+              <PlaceSuggest
+                value={area}
+                onChange={(label, nextLat, nextLng) => {
+                  setArea(label);
+                  setLat(nextLat);
+                  setLng(nextLng);
+                }}
+                placeholder="Type your mandal, town, or landmark"
+              />
+            </div>
+          </section>
 
-        <label className="mt-4 block text-[14px] text-[var(--mute)]">ID card photo</label>
-        <input
-          required
-          type="file"
-          accept="image/*"
-          className="mt-2 w-full"
-          onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
-        />
-        {photo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="ID preview" className="mt-2 max-h-40 object-contain border border-[var(--rule)]" />
-        )}
+          <section className="desk-file mt-4">
+            <div className="desk-file-head">
+              <span className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">Proof</span>
+              <span className="text-[13px] text-[var(--mute)]">03</span>
+            </div>
+            <div className="px-5 py-4">
+              <label className="block text-[14px] text-[var(--mute)]">ID card photo</label>
+              <input
+                required
+                type="file"
+                accept="image/*"
+                className="mt-2 w-full border border-[var(--ink)] bg-white p-3"
+                onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
+              />
+              {photo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photo} alt="ID preview" className="mt-3 max-h-40 object-contain border border-[var(--ink)] bg-white p-2" />
+              )}
+            </div>
+          </section>
 
-        <button type="submit" className="site-btn site-btn-ink mt-6 w-full">
-          Submit for review
-        </button>
-        {err && <p className="mt-2 text-[var(--crit)]">{err}</p>}
+          <button type="submit" className="site-btn site-btn-ink mt-6 w-full">
+            Submit for review
+          </button>
+          {err && <p className="mt-3 text-[var(--crit)]">{err}</p>}
+        </div>
       </form>
     </Site>
   );
@@ -134,15 +180,9 @@ function Field({
   required?: boolean;
 }) {
   return (
-    <>
-      <label className="block mt-4 text-[14px] text-[var(--mute)]">{label}</label>
-      <input
-        required={required}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="site-input"
-      />
-    </>
+    <div>
+      <label className="mt-3 block text-[14px] text-[var(--mute)]">{label}</label>
+      <input required={required} type={type} value={value} onChange={(e) => onChange(e.target.value)} className="site-input" />
+    </div>
   );
 }

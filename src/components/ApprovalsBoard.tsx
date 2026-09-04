@@ -7,7 +7,6 @@ import type { SupportApplication } from "@/lib/types";
 
 export function ApprovalsBoard() {
   const [rows, setRows] = useState<SupportApplication[]>([]);
-
   const [notice, setNotice] = useState("");
 
   useEffect(() => listenApplications(setRows), []);
@@ -52,38 +51,52 @@ export function ApprovalsBoard() {
 
   return (
     <div className="h-full overflow-auto bg-[var(--paper)]">
-      <header className="sticky top-0 z-10 bg-[var(--paper)] px-5 py-4 border-b border-[var(--ink)]">
-        <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Gate</p>
-        <h1 className="mt-1 text-[26px] font-semibold leading-none">Approvals</h1>
-        <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
-          Government and NGO chits. The clerk reads the file first. You can still override.
-        </p>
-        {notice && <p className="mt-2 text-[15px]">{notice}</p>}
+      <header className="ops-head bg-[var(--paper)]">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="ops-kicker">Gate</p>
+            <h1>Approvals</h1>
+            <p className="mt-1.5 max-w-[62ch] text-[13px] text-[var(--mute)]">
+              Government and NGO chits. The clerk reads the file first. You can still override.
+            </p>
+          </div>
+          <span className="ops-chip ops-chip-high">{pending.length} pending</span>
+        </div>
+        {notice && <p className="mt-2 text-[14px]">{notice}</p>}
       </header>
 
-      {pending.length === 0 && <p className="px-5 py-6 text-[var(--mute)]">No pending applications.</p>}
+      {pending.length === 0 && <p className="px-4 py-5 text-[var(--mute)]">No pending applications.</p>}
 
-      <ul className="p-5 space-y-4">
+      <ul className="p-4 grid lg:grid-cols-2 gap-3">
         {pending.map((r) => (
-          <li key={r.id} className="ops-dossier">
-            <div className="font-semibold">
-              {r.name} · {r.kind === "government" ? "Government" : "NGO / volunteer"}
+          <li key={r.id} className="ops-dossier" data-sev={r.clerk && !r.clerk.allow ? "high" : undefined}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold leading-snug">{r.name}</p>
+                <p className="mt-0.5 text-[12px] text-[var(--mute)]">
+                  {r.kind === "government" ? "Government" : "NGO / volunteer"}
+                </p>
+              </div>
+              {r.clerk && (
+                <span className={r.clerk.allow ? "ops-chip ops-chip-ok" : "ops-chip ops-chip-high"}>
+                  {r.clerk.allow ? "allow" : "hold"} · {Math.round(r.clerk.confidence * 100)}%
+                </span>
+              )}
             </div>
-            <div className="text-[var(--mute)] mt-1">
+            <div className="mt-2 text-[13px] text-[var(--mute)]">
               {r.email}
               {r.department ? ` · ${r.designation}, ${r.department}` : ""}
               {r.orgName ? ` · ${r.volunteerRole}, ${r.orgName}` : ""}
               {r.areaLabel ? ` · ${r.areaLabel}` : ""}
             </div>
-            <div className="text-[14px] mt-1 text-[var(--mute)]">
+            <div className="text-[12px] mt-1 text-[var(--mute)]">
               {r.idNumber ? `ID ${r.idNumber}` : ""}
               {r.registrationNo ? `Reg ${r.registrationNo}` : ""} {r.phone ?? ""}
             </div>
-            {r.note && <p className="mt-2">{r.note}</p>}
+            {r.note && <p className="mt-2 text-[14px]">{r.note}</p>}
             {r.clerk && (
-              <div className="mt-3 border border-[var(--ink)] bg-[var(--paper)] px-3 py-3 text-[14px]">
-                <p className="text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">Clerk ruling</p>
-                <p className="mt-1 font-semibold">{r.clerk.allow ? "Allow" : "Hold"} · {Math.round(r.clerk.confidence * 100)}%</p>
+              <div className="mt-2 border border-[var(--ink)] bg-[var(--paper-2)] px-3 py-2 text-[13px]">
+                <p className="ops-kicker">Clerk ruling</p>
                 <p className="mt-1">{r.clerk.summary}</p>
                 {r.clerk.flags?.length ? (
                   <p className="mt-1 text-[var(--mute)]">{r.clerk.flags.join(" · ")}</p>
@@ -92,13 +105,13 @@ export function ApprovalsBoard() {
             )}
             {r.photoDataUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={r.photoDataUrl} alt="ID" className="mt-3 max-h-56 object-contain border border-[var(--rule)]" />
+              <img src={r.photoDataUrl} alt="ID" className="mt-2 max-h-44 object-contain border border-[var(--rule)]" />
             )}
             <div className="mt-3 flex gap-2">
-              <button type="button" className="h-10 px-4 bg-[var(--ink)] text-white" onClick={() => void decide(r, true)}>
+              <button type="button" className="h-9 px-3 bg-[var(--ink)] text-white text-[13px]" onClick={() => void decide(r, true)}>
                 Yes — allow
               </button>
-              <button type="button" className="h-10 px-4 border border-[var(--ink)] bg-white" onClick={() => void decide(r, false)}>
+              <button type="button" className="h-9 px-3 border border-[var(--ink)] bg-white text-[13px]" onClick={() => void decide(r, false)}>
                 No — reject
               </button>
             </div>
@@ -107,14 +120,25 @@ export function ApprovalsBoard() {
       </ul>
 
       {rest.length > 0 && (
-        <ul className="px-5 pb-8">
-          {rest.map((r) => (
-            <li key={r.id} className="py-2 border-t border-[var(--rule)] text-[var(--mute)]">
-              {r.name} · {r.status} · {r.email}
-              {r.areaLabel ? ` · ${r.areaLabel}` : ""}
-            </li>
-          ))}
-        </ul>
+        <div className="px-4 pb-8">
+          <p className="ops-kicker mb-2">Closed</p>
+          <ul className="grid sm:grid-cols-2 gap-2">
+            {rest.map((r) => (
+              <li key={r.id} className="ops-dossier py-2">
+                <div className="flex justify-between gap-2">
+                  <span>{r.name}</span>
+                  <span className={r.status === "allowed" ? "ops-chip ops-chip-ok" : "ops-chip ops-chip-critical"}>
+                    {r.status}
+                  </span>
+                </div>
+                <p className="mt-1 text-[12px] text-[var(--mute)]">
+                  {r.email}
+                  {r.areaLabel ? ` · ${r.areaLabel}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

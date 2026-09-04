@@ -2,14 +2,17 @@ import { coerceSitrep, fallbackSitrep } from "@/lib/agents/summary";
 import type { VerifyClerkAsk } from "@/lib/agents/verification";
 import { parseVerifyTag } from "@/lib/agents/verification";
 import { coerceBrief, coercePreposition, fallbackBrief, fallbackPreposition, sectorContextText } from "@/lib/delta";
+import { ROADS, WARDS } from "@/lib/geo";
 import type {
   BeforeBrief,
   DispatchCandidate,
+  EventType,
   Hazard,
   Incident,
   IncidentNear,
   IncidentReason,
   InfraAsset,
+  Lang,
   PrepositionPlan,
   ResourceAsset,
   Sitrep,
@@ -731,4 +734,123 @@ export function reasonFromStudy(study: ReportStudy): IncidentReason {
     decision: study.decision,
     model: study.model,
   };
+}
+
+export function coerceLang(raw: unknown, text = ""): Lang {
+  const s = String(raw ?? "").toLowerCase();
+  if (s.startsWith("te") || s.includes("telugu")) return "te";
+  if (s.startsWith("hi") || s.includes("hindi") || s.includes("devanagari")) return "hi";
+  if (s.startsWith("en") || s.includes("english")) return "en";
+  if (/[\u0C00-\u0C7F]/.test(text)) return "te";
+  if (/[\u0900-\u097F]/.test(text)) return "hi";
+  return "en";
+}
+
+function placesCatalog(): string {
+  const wards = WARDS.map((w) => `${w.id} = ${w.name}`).join("; ");
+  const roads = ROADS.map((r) => `${r.id} = ${r.name}`).join("; ");
+  return `Wards/sites: ${wards}. Roads: ${roads}.`;
+}
+
+export type TranslateClerk = {
+  language: Lang;
+  translated: string;
+  model?: string;
+};
+
+export async function detectAndTranslate(text: string): Promise<TranslateClerk | null> {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const hit = await brainRaw(
+    `Detect the language of this field message and translate it into clear operational English.
+Return JSON only:
+{"language":"en"|"hi"|"te","translated":"English one or two sentences, no brackets, no language tags"}
+
+Rules:
+- language is the source: en English, hi Hindi, te Telugu. If mixed, pick the dominant script/language.
+- If already English, copy the meaning into clean English (fix typos, keep facts).
+- Do not wrap the translation in [HI→EN] or similar.
+- Keep numbers, place names, and resource counts.
+
+Text: ${trimmed}`,
+    14000,
+    500,
+  );
+  if (!hit) return null;
+  const translated = String(hit.json.translated ?? hit.json.english ?? "").trim();
+  if (!translated) return null;
+  return {
+    language: coerceLang(hit.json.language, trimmed),
+    translated,
+    model: hit.model,
+  };
+}
+
+export type ChaoticIntakeClerk = {
+  type: EventType;
+  locationId: string;
+  locationLabel: string;
+  resource: string;
+  quantity: number;
+  hazardStatus?: "open" | "blocked" | "unknown";
+  language: Lang;
+  translated: string;
+  model?: string;
+};
+
+export async function parseChaoticIntake(input: {
+  rawText: string;
+  source?: string;
+}): Promise<ChaoticIntakeClerk | null> {
+  const text = input.rawText.trim();
+  if (!text) return null;
+  const hit = await brainRaw(
+    `Parse this chaotic field message (WhatsApp/radio/SMS, possibly Hindi or Telugu) into ONE structured event. It may be a NEED, an OFFER of aid, or a HAZARD (road/bridge open or blocked).
+Return JSON only:
+{"type":"request"|"offer"|"hazard_report","language":"en"|"hi"|"te","translated":"English one-liner","locationId":"known id or LOC-slug","locationLabel":"short place name","resource":"short noun (medicine, trucks, boats, access, flood-rescue team, water tankers, ...)","quantity":number,"hazardStatus":"open"|"blocked"|"unknown"|null}
+
+Rules:
+- request = people need aid (medicine, food, water, rescue, trapped/stranded).
+- offer = someone HAS / can send / standing by with trucks, boats, staff, kits. Not a need.
+- hazard_report = road/bridge/access blocked, open, collapsed, restored. resource is usually "access".
+- Detect language. Translate into English in "translated" with no [HI→EN] wrapper.
+- Map place to a known ward/site/road id when possible.
+- quantity: people count if stuck; units offered or needed; default 1.
+- hazardStatus only for hazard_report.
+
+${placesCatalog()}
+
+Source: ${input.source || "field"}
+Text: ${text}`,
+    18000,
+    800,
+  );
+  if (!hit) return null;
+  const j = hit.json;
+  const type: EventType | null =
+    j.type === "offer" || j.type === "hazard_report" || j.type === "request" ? j.type : null;
+  const locationLabel = String(j.locationLabel ?? "").trim();
+  const resource = String(j.resource ?? "").trim();
+  const translated = String(j.translated ?? "").trim();
+  if (!type || !locationLabel || !resource) return null;
+  const locationId =
+    String(j.locationId ?? "").trim() ||
+    `LOC-${locationLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`;
+  const clerk: ChaoticIntakeClerk = {
+    type,
+    locationId,
+    locationLabel,
+    resource,
+    quantity: typeof j.quantity === "number" ? j.quantity : 1,
+    language: coerceLang(j.language, text),
+    translated: translated || text,
+    model: hit.model,
+  };
+  if (type === "hazard_report") {
+    clerk.hazardStatus =
+      j.hazardStatus === "open" || j.hazardStatus === "blocked" || j.hazardStatus === "unknown"
+        ? j.hazardStatus
+        : "unknown";
+  }
+  return clerk;
 }

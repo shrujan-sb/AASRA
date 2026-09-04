@@ -23,31 +23,35 @@ export function MapBoard() {
   const here = incidents.filter((i) => i.locationId === sel);
   const units = resources.filter((r) => r.locationId === sel);
   const routeLogs = logs.filter((l) => l.agent === "routing").slice(0, 6);
+  const hot = here.find((i) => i.severity === "critical") ?? here[0];
 
   return (
-    <div className="h-full grid lg:grid-cols-[1fr_280px] min-h-0">
-      <div className="px-6 py-5 flex flex-col min-h-0">
-        <div className="flex items-center justify-between mb-3">
+    <div className="h-full grid lg:grid-cols-[1fr_300px] min-h-0">
+      <div className="px-5 py-4 flex flex-col min-h-0">
+        <div className="flex items-center justify-between gap-3 mb-2">
           <div>
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Ground</p>
-            <h1 className="text-[26px] font-semibold leading-none">Map</h1>
+            <p className="ops-kicker">Ground</p>
+            <h1 className="text-[22px] font-semibold leading-none">Map</h1>
           </div>
-          <button
-            type="button"
-            disabled={closing}
-            className="h-9 px-3 bg-[var(--crit)] text-[var(--paper)] disabled:opacity-50"
-            onClick={() => {
-              setClosing(true);
-              void injectRoadBlock("NH-16")
-                .then((r) => setNote(r.headline || "NH-16 closed — missions rechecked."))
-                .finally(() => setClosing(false));
-            }}
-          >
-            {closing ? "Rerouting…" : "Close NH-16"}
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="ops-chip ops-chip-critical">{blocked.size} closed</span>
+            <button
+              type="button"
+              disabled={closing}
+              className="h-8 px-3 bg-[var(--crit)] text-[var(--paper)] text-[13px] disabled:opacity-50"
+              onClick={() => {
+                setClosing(true);
+                void injectRoadBlock("NH-16")
+                  .then((r) => setNote(r.headline || "NH-16 closed — missions rechecked."))
+                  .finally(() => setClosing(false));
+              }}
+            >
+              {closing ? "Rerouting…" : "Close NH-16"}
+            </button>
+          </div>
         </div>
         {note && <p className="mb-2 text-[13px]">{note}</p>}
-        <svg viewBox="0 0 640 420" className="flex-1 min-h-[320px] w-full bg-[var(--paper-2)]">
+        <svg viewBox="0 0 640 420" className="flex-1 min-h-[320px] w-full bg-[var(--paper-2)] border border-[var(--ink)]">
           <rect x="0" y="340" width="640" height="80" fill="#8aa4b0" />
           <text x="16" y="372" fill="#efe6d6" fontSize="14" fontFamily="Poppins, sans-serif">
             Krishna river
@@ -57,16 +61,16 @@ export function MapBoard() {
             const a = ward(r.from);
             const b = ward(r.to);
             if (!a || !b) return null;
-            const hot = blocked.has(r.id);
+            const isHot = blocked.has(r.id);
             const x1 = xy(a.x, "x");
             const y1 = xy(a.y, "y");
             const x2 = xy(b.x, "x");
             const y2 = xy(b.y, "y");
             return (
               <g key={r.id}>
-                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={hot ? "#c42718" : "#1c1612"} strokeWidth={hot ? 5 : 2} />
-                <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 8} fill={hot ? "#c42718" : "#5c5348"} fontSize="11" fontFamily="Poppins, sans-serif" textAnchor="middle">
-                  {hot ? `Closed · ${r.name}` : r.name}
+                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={isHot ? "#c42718" : "#1c1612"} strokeWidth={isHot ? 5 : 2} />
+                <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 8} fill={isHot ? "#c42718" : "#5c5348"} fontSize="11" fontFamily="Poppins, sans-serif" textAnchor="middle">
+                  {isHot ? `Closed · ${r.name}` : r.name}
                 </text>
               </g>
             );
@@ -110,7 +114,7 @@ export function MapBoard() {
             );
           })}
         </svg>
-        <div className="mt-3 flex gap-4 text-[13px] text-[var(--mute)]">
+        <div className="mt-2 flex flex-wrap gap-3 text-[12px] text-[var(--mute)]">
           <span>
             <i className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--crit)] mr-1" />
             critical
@@ -127,31 +131,48 @@ export function MapBoard() {
         </div>
       </div>
 
-      <aside className="border-t lg:border-t-0 lg:border-l border-[var(--rule)] px-5 py-5 overflow-auto">
-        <p className="text-[13px] text-[var(--mute)]">Click a ward</p>
+      <aside className="border-t lg:border-t-0 lg:border-l border-[var(--ink)] bg-[var(--paper)] overflow-auto p-4">
+        <p className="ops-kicker">Click a ward</p>
         <h2 className="text-[18px] font-semibold mt-1">{chosen?.name ?? "Sector"}</h2>
-        {here.length === 0 && <p className="mt-3 text-[var(--mute)]">No open need here.</p>}
-        <ul className="mt-3">
-          {here.map((i) => (
-            <li key={i.id} className="py-2 border-t border-[var(--rule)]">
-              <div>{i.title}</div>
-              {i.aiPick && <p className="mt-1 text-[13px] text-[var(--mute)]">{i.aiPick.reason}</p>}
-            </li>
-          ))}
-        </ul>
-        {units.length > 0 && (
-          <ul className="mt-4">
-            {units.map((u) => (
-              <li key={u.id} className="text-[14px]">
-                {u.callsign} · {u.status}
+        <div className="mt-3 ops-dossier" data-sev={hot?.severity}>
+          <div className="flex justify-between gap-2">
+            <span className="text-[12px] text-[var(--mute)]">{sel ?? "—"}</span>
+            {hot && (
+              <span className={`ops-chip ops-chip-${hot.severity}`}>
+                {hot.severity === "high" ? "urgent" : hot.severity}
+              </span>
+            )}
+          </div>
+          {here.length === 0 && <p className="mt-2 text-[13px] text-[var(--mute)]">No open need here.</p>}
+          <ul className="mt-2 space-y-2">
+            {here.map((i) => (
+              <li key={i.id} className="border-t border-[var(--rule)] pt-2 first:border-0 first:pt-0">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium text-[14px] leading-snug">{i.title}</span>
+                  <span className={`ops-chip ops-chip-${i.severity}`}>
+                    {i.severity === "high" ? "urgent" : i.severity}
+                  </span>
+                </div>
+                {i.reason && <p className="mt-1 text-[13px] leading-snug">{i.reason.decision || i.reason.summary}</p>}
+                {i.aiPick && !i.reason && <p className="mt-1 text-[12px] text-[var(--mute)]">{i.aiPick.reason}</p>}
               </li>
             ))}
           </ul>
-        )}
+          {units.length > 0 && (
+            <ul className="mt-3 border-t border-[var(--rule)] pt-2 space-y-1">
+              {units.map((u) => (
+                <li key={u.id} className="text-[13px] flex justify-between gap-2">
+                  <span>{u.callsign}</span>
+                  <span className={u.status === "free" ? "ops-chip ops-chip-ok" : "ops-chip ops-chip-warn"}>{u.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         {routeLogs.length > 0 && (
-          <div className="mt-5 border-t border-[var(--rule)] pt-3">
-            <p className="text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">Reroute desk</p>
-            <ul className="mt-2 space-y-2">
+          <div className="mt-3 ops-dossier">
+            <p className="ops-kicker">Reroute desk</p>
+            <ul className="mt-2 space-y-1.5">
               {routeLogs.map((l) => (
                 <li key={l.id} className="text-[13px] leading-snug">
                   {l.message}
