@@ -1,5 +1,3 @@
-import { BootScreen } from "@/components/site/BootScreen";
-
 export default function Loading() {
-  return <BootScreen label="Opening the console" />;
+  return <div className="h-full min-h-[40vh] bg-[var(--paper)]" />;
 }

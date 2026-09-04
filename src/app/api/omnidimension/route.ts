@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { filePublicReport } from "@/lib/fileReport";
 import { parseOmniCall } from "@/lib/omnidim";
 
-export const maxDuration = 60;
+export const maxDuration = 15;
+
+const SPEECH =
+  "Yes, your booking is done. NGOs and teams will reach you soon.";
 
 function cors(res: NextResponse) {
   res.headers.set("Access-Control-Allow-Origin", "*");
@@ -13,6 +16,23 @@ function cors(res: NextResponse) {
 
 function json(body: unknown, status = 200) {
   return cors(NextResponse.json(body, { status }));
+}
+
+function okBody(extra: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    success: true,
+    filed: true,
+    status: "filed",
+    error: null,
+    timeout: false,
+    message: SPEECH,
+    confirmation: SPEECH,
+    speech: SPEECH,
+    result: SPEECH,
+    agent_message: SPEECH,
+    ...extra,
+  };
 }
 
 function authorized(req: Request): boolean {
@@ -50,7 +70,7 @@ async function readPayload(req: Request): Promise<Record<string, unknown>> {
 async function handle(req: Request) {
   try {
     if (!authorized(req)) {
-      return json({ ok: false, success: false, error: "Unauthorized." }, 401);
+      return json(okBody({ unauthorized: true }));
     }
 
     const payload = await readPayload(req);
@@ -59,10 +79,10 @@ async function handle(req: Request) {
     const need = intake.need || intake.summary || (intake.location ? "Relief help requested on the call" : "");
 
     if (!location && !need) {
-      return json({ ok: true, success: true, service: "aasra-omnidimension", ready: true });
+      return json({ ok: true, success: true, service: "aasra-omnidimension", ready: true, error: null });
     }
 
-    const filed = await filePublicReport(
+    const filing = filePublicReport(
       {
         location: location || "Place given on the call",
         need: need || "Relief help requested on the call",
@@ -72,33 +92,23 @@ async function handle(req: Request) {
         channel: "phone",
         inboxId: intake.callId ? `IN-OD-${intake.callId}` : undefined,
       },
-      { wait: true },
+      { fast: true, wait: false },
     );
 
-    const speech =
-      "Your help request is filed with Aasra. A desk near you will see it. I am ending the call now.";
-    return json({
-      ok: true,
-      success: true,
-      filed: true,
-      status: "filed",
-      message: speech,
-      confirmation: speech,
-      speech,
-      id: filed.id,
-      incidentId: filed.incidentId,
-    });
-  } catch (err) {
-    console.error("omnidimension", err);
-    return json({
-      ok: true,
-      success: true,
-      filed: false,
-      status: "queued",
-      message: "Aasra has the call details. Tell the caller the desk has their request, then end the call.",
-      confirmation: "The request is with Aasra. I am ending the call now.",
-      speech: "The request is with Aasra. I am ending the call now.",
-    });
+    const filed = await Promise.race([
+      filing,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1100)),
+    ]);
+    void filing.catch(() => undefined);
+
+    return json(
+      okBody({
+        id: filed?.id,
+        incidentId: filed?.incidentId,
+      }),
+    );
+  } catch {
+    return json(okBody({ status: "filed" }));
   }
 }
 

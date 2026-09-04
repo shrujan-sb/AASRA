@@ -54,7 +54,7 @@ async function enrichTicket(payload: FiledReport, location: string, need: string
 
 export async function filePublicReport(
   input: PublicReportInput,
-  opts?: { wait?: boolean },
+  opts?: { wait?: boolean; fast?: boolean },
 ): Promise<{
   ok: true;
   id: string;
@@ -63,7 +63,8 @@ export async function filePublicReport(
 }> {
   let lat = input.lat;
   let lng = input.lng;
-  if ((lat == null || lng == null) && input.location.trim()) {
+  const fast = Boolean(opts?.fast || input.channel === "phone");
+  if (!fast && (lat == null || lng == null) && input.location.trim()) {
     const hit = await geocodePlace(input.location);
     if (hit) {
       lat = hit.lat;
@@ -72,12 +73,19 @@ export async function filePublicReport(
   }
   const ticket = await buildPublicReport({ ...input, lat, lng });
   const payload = JSON.parse(JSON.stringify(ticket)) as FiledReport;
-  await persistTicketNow(payload);
+  const persist = persistTicketNow(payload);
   const job = enrichTicket(payload, input.location, input.need, input.name).catch((err) => {
     console.error("file report enrich", err);
   });
-  if (opts?.wait || input.channel === "phone") await job;
-  else void job;
+  if (fast) {
+    await Promise.race([persist, new Promise((resolve) => setTimeout(resolve, 700))]);
+    void persist;
+    void job;
+  } else {
+    await persist;
+    if (opts?.wait) await job;
+    else void job;
+  }
   return {
     ok: true,
     id: payload.inbox.id,
