@@ -10,10 +10,22 @@ export function MapBoard() {
   const ward = (id: string) => WARDS.find((w) => w.id === id);
 
   return (
-    <div className="h-full p-2 grid grid-rows-[1fr_auto] gap-2">
-      <svg viewBox="0 0 100 100" className="w-full h-full bg-[#080c10] border border-[var(--line)]">
-        <text x="2" y="5" fill="#7d8b86" fontSize="3">
-          KRISHNA BASIN · VIJAYAWADA SECTOR
+    <div className="h-full overflow-auto px-6 md:px-10 py-8 flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <h2 className="text-4xl font-semibold">
+          Sector <span className="mark text-6xl text-[var(--crit)]">map</span>
+        </h2>
+        <button
+          type="button"
+          className="h-12 px-5 bg-[var(--crit)] text-[var(--paper)] text-lg font-medium"
+          onClick={() => void injectRoadBlock("NH-16")}
+        >
+          Block NH-16 now
+        </button>
+      </div>
+      <svg viewBox="0 0 100 100" className="w-full flex-1 min-h-[480px] bg-[var(--paper-2)]">
+        <text x="3" y="7" fill="#1c1612" fontSize="3.2" fontFamily="Poppins, sans-serif">
+          Vijayawada · Krishna basin
         </text>
         {ROADS.map((r) => {
           const a = ward(r.from);
@@ -22,18 +34,10 @@ export function MapBoard() {
           const hot = blocked.has(r.id);
           return (
             <g key={r.id}>
-              <line
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={hot ? "#e23d2d" : "#24303a"}
-                strokeWidth={hot ? 1.2 : 0.6}
-                strokeDasharray={hot ? "2 1" : undefined}
-              />
+              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={hot ? "#c42718" : "#1c1612"} strokeWidth={hot ? 1.6 : 0.7} />
               {hot && (
-                <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 1.5} fill="#e23d2d" fontSize="2.2">
-                  BLOCKED {r.id}
+                <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 2} fill="#c42718" fontSize="3.4" fontFamily="Poppins, sans-serif">
+                  blocked
                 </text>
               )}
             </g>
@@ -54,42 +58,30 @@ export function MapBoard() {
                 y1={p1.y}
                 x2={p2.x}
                 y2={p2.y}
-                stroke={a.status === "rerouted" ? "#e8941a" : "#3a8fd4"}
-                strokeWidth="0.5"
-                opacity="0.85"
+                stroke={a.status === "rerouted" ? "#b45309" : "#163a48"}
+                strokeWidth="0.9"
               />
             );
           })}
         {WARDS.map((w) => {
           const hits = incidents.filter((i) => i.locationId === w.id);
           const sev = hits[0]?.severity;
-          const fill = sev === "critical" ? "#e23d2d" : sev === "high" ? "#e8941a" : "#3d9b6e";
+          const fill = sev === "critical" ? "#c42718" : sev === "high" ? "#b45309" : hits.length ? "#1f6b4a" : "#1c1612";
           return (
             <g key={w.id}>
-              <circle cx={w.x} cy={w.y} r={hits.length ? 1.8 : 1.1} fill={hits.length ? fill : "#3a8fd4"} />
-              <text x={w.x + 2} y={w.y + 1} fill="#d5ddd8" fontSize="2.1">
+              <circle cx={w.x} cy={w.y} r={hits.length ? 2.2 : 1.4} fill={fill} />
+              <text x={w.x + 2.4} y={w.y + 1.2} fill="#1c1612" fontSize="2.6" fontFamily="Poppins, sans-serif">
                 {w.id}
               </text>
             </g>
           );
         })}
-        {resources.map((r) => {
-          const w = ward(r.locationId);
-          if (!w) return null;
-          return <rect key={r.id} x={w.x - 3.2} y={w.y - 0.5} width="1" height="1" fill={r.status === "free" ? "#3d9b6e" : "#f07a22"} />;
-        })}
       </svg>
-      <div className="text-[10px] text-[var(--muted)] flex flex-wrap items-center gap-3 px-1">
-        <span>Node = ward · Red dash = blocked road · Cyan = assignment · Amber = reroute</span>
-        <span className="text-[var(--crit)]">{[...blocked].join(" ") || "no closures"}</span>
-        <button
-          type="button"
-          className="ml-auto border border-[var(--crit)] text-[var(--crit)] px-2 py-1 uppercase tracking-widest hover:bg-[#3a1512]"
-          onClick={() => void injectRoadBlock("NH-16")}
-        >
-          Inject NH-16 block
-        </button>
-      </div>
+      <p className="text-lg">
+        Closures:{" "}
+        <span className="mark text-4xl text-[var(--crit)]">{[...blocked].join(" ") || "none"}</span>
+        <span className="text-[var(--mute)]"> · ink line = corridor · river line = assignment · ochre = reroute</span>
+      </p>
     </div>
   );
 }
