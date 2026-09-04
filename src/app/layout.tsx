@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Oxanium } from "next/font/google";
+import localFont from "next/font/local";
+import { Poppins } from "next/font/google";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
-const oxanium = Oxanium({
-  variable: "--font-oxanium",
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const ibm = IBM_Plex_Mono({
-  variable: "--font-ibm",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const wadingr = localFont({
+  src: "../fonts/WadingrTrial.otf",
+  variable: "--font-wadingr",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -23,8 +24,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${oxanium.variable} ${ibm.variable} h-full`}>
-      <body className="min-h-full console-grid">
+    <html lang="en" className={`${poppins.variable} ${wadingr.variable} h-full`}>
+      <body className={`${poppins.className} min-h-full`}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
