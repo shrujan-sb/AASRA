@@ -43,7 +43,7 @@ export async function approveSupport(row: SupportApplication): Promise<void> {
   });
 }
 
-export async function claimIncidentHelp(incident: Incident, helper: IncidentHelper): Promise<Incident> {
+export async function claimIncidentHelp(incident: Incident, helper: IncidentHelper, claimNote?: string): Promise<Incident> {
   hydrateLocal();
   const current = getById<Incident>("incidents", incident.id) ?? incident;
   if (current.helper) return current;
@@ -52,6 +52,7 @@ export async function claimIncidentHelp(incident: Incident, helper: IncidentHelp
     helper,
     status: "assigned",
     updatedAt: Date.now(),
+    claimNote: claimNote || current.claimNote,
   };
   await upsert("incidents", incident.id, next);
   return next;

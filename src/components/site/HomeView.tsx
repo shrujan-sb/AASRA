@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Site } from "@/components/site/Site";
 import { useAuth } from "@/lib/auth";
+import type { BeforeBrief } from "@/lib/types";
 
 export function HomeView() {
   const { session, ready, firebaseReady, authError, signInGoogle, logout } = useAuth();
@@ -123,6 +124,8 @@ export function HomeView() {
           </aside>
         </div>
       </section>
+
+      <PublicRiskStrip />
 
       <section className="border-b border-[var(--ink)] bg-[var(--paper)]">
         <div className="site-wrap py-14">
@@ -261,4 +264,36 @@ function Clock() {
     return () => clearInterval(id);
   }, []);
   return <span suppressHydrationWarning className="font-medium tabular-nums">{t || "—"}</span>;
+}
+
+function PublicRiskStrip() {
+  const [line, setLine] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    void fetch("/api/predict", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data: { brief?: BeforeBrief }) => {
+        if (!live) return;
+        const h = data.brief?.headline?.trim();
+        if (h) setLine(h);
+      })
+      .catch(() => {
+        /* public strip is optional */
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!line) return null;
+
+  return (
+    <section className="border-b border-[var(--ink)] bg-white">
+      <div className="site-wrap py-6">
+        <p className="text-[13px] tracking-[0.16em] uppercase text-[var(--mute)]">Next 24–48 hours</p>
+        <p className="mt-2 max-w-[62ch] text-[17px] leading-snug font-medium">{line}</p>
+      </div>
+    </section>
+  );
 }

@@ -10,16 +10,19 @@ function xy(n: number, axis: "x" | "y") {
 }
 
 export function MapBoard() {
-  const { incidents, resources, hazards, assignments } = useOps();
+  const { incidents, resources, hazards, assignments, logs } = useOps();
   const blocked = useMemo(
     () => new Set(hazards.filter((h) => h.status === "blocked").map((h) => h.roadId)),
     [hazards],
   );
   const [sel, setSel] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [note, setNote] = useState("");
   const ward = (id: string) => WARDS.find((w) => w.id === id);
   const chosen = WARDS.find((w) => w.id === sel);
   const here = incidents.filter((i) => i.locationId === sel);
   const units = resources.filter((r) => r.locationId === sel);
+  const routeLogs = logs.filter((l) => l.agent === "routing").slice(0, 6);
 
   return (
     <div className="h-full grid lg:grid-cols-[1fr_280px] min-h-0">
@@ -29,10 +32,21 @@ export function MapBoard() {
             <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Ground</p>
             <h1 className="text-[26px] font-semibold leading-none">Map</h1>
           </div>
-          <button type="button" className="h-9 px-3 bg-[var(--crit)] text-[var(--paper)]" onClick={() => void injectRoadBlock("NH-16")}>
-            Close NH-16
+          <button
+            type="button"
+            disabled={closing}
+            className="h-9 px-3 bg-[var(--crit)] text-[var(--paper)] disabled:opacity-50"
+            onClick={() => {
+              setClosing(true);
+              void injectRoadBlock("NH-16")
+                .then((r) => setNote(r.headline || "NH-16 closed — missions rechecked."))
+                .finally(() => setClosing(false));
+            }}
+          >
+            {closing ? "Rerouting…" : "Close NH-16"}
           </button>
         </div>
+        {note && <p className="mb-2 text-[13px]">{note}</p>}
         <svg viewBox="0 0 640 420" className="flex-1 min-h-[320px] w-full bg-[var(--paper-2)]">
           <rect x="0" y="340" width="640" height="80" fill="#8aa4b0" />
           <text x="16" y="372" fill="#efe6d6" fontSize="14" fontFamily="Poppins, sans-serif">
@@ -120,7 +134,8 @@ export function MapBoard() {
         <ul className="mt-3">
           {here.map((i) => (
             <li key={i.id} className="py-2 border-t border-[var(--rule)]">
-              {i.title}
+              <div>{i.title}</div>
+              {i.aiPick && <p className="mt-1 text-[13px] text-[var(--mute)]">{i.aiPick.reason}</p>}
             </li>
           ))}
         </ul>
@@ -132,6 +147,18 @@ export function MapBoard() {
               </li>
             ))}
           </ul>
+        )}
+        {routeLogs.length > 0 && (
+          <div className="mt-5 border-t border-[var(--rule)] pt-3">
+            <p className="text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">Reroute desk</p>
+            <ul className="mt-2 space-y-2">
+              {routeLogs.map((l) => (
+                <li key={l.id} className="text-[13px] leading-snug">
+                  {l.message}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </aside>
     </div>

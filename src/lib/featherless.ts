@@ -1,4 +1,17 @@
-import type { IncidentNear, IncidentReason, Severity, SupportApplication, SupportKind } from "@/lib/types";
+import { coerceBrief, fallbackBrief, sectorContextText } from "@/lib/delta";
+import type {
+  BeforeBrief,
+  DispatchCandidate,
+  Hazard,
+  Incident,
+  IncidentNear,
+  IncidentReason,
+  InfraAsset,
+  ResourceAsset,
+  Severity,
+  SupportApplication,
+  SupportKind,
+} from "@/lib/types";
 
 export type ReportStudy = IncidentReason & {
   severity?: Severity;
@@ -27,9 +40,9 @@ export type ClaimClerk = {
 };
 
 const FALLBACK_MODELS = [
+  "Qwen/Qwen2.5-7B-Instruct",
   process.env.FEATHERLESS_MODEL,
   "Qwen/Qwen3-8B",
-  "Qwen/Qwen2.5-7B-Instruct",
 ].filter((m, i, arr): m is string => Boolean(m) && arr.indexOf(m) === i);
 
 const SYSTEM =
@@ -50,7 +63,29 @@ function parseJsonObject(raw: string): Record<string, unknown> | null {
   }
 }
 
-async function complete(model: string, key: string, user: string, signal: AbortSignal): Promise<{ text: string; model: string } | null> {
+function wantsThinking(model: string): boolean {
+  return /Qwen3/i.test(model);
+}
+
+function messageText(msg: {
+  content?: string | null;
+  reasoning_content?: string | null;
+  reasoning?: string | null;
+} | undefined): string {
+  if (!msg) return "";
+  return [msg.content, msg.reasoning_content, typeof msg.reasoning === "string" ? msg.reasoning : ""]
+    .filter((part) => typeof part === "string" && part.trim())
+    .join("\n");
+}
+
+async function complete(
+  model: string,
+  key: string,
+  user: string,
+  signal: AbortSignal,
+  maxTokens = 1400,
+): Promise<{ text: string; model: string } | null> {
+  const thinking = wantsThinking(model);
   const res = await fetch("https://api.featherless.ai/v1/chat/completions", {
     method: "POST",
     signal,
@@ -63,8 +98,8 @@ async function complete(model: string, key: string, user: string, signal: AbortS
     body: JSON.stringify({
       model,
       temperature: 0.15,
-      max_tokens: 1400,
-      chat_template_kwargs: { enable_thinking: true, thinking: true },
+      max_tokens: maxTokens,
+      ...(thinking ? { chat_template_kwargs: { enable_thinking: true, thinking: true } } : {}),
       messages: [
         { role: "system", content: SYSTEM },
         { role: "user", content: user },
@@ -73,15 +108,24 @@ async function complete(model: string, key: string, user: string, signal: AbortS
   });
   if (!res.ok) return null;
   const data = (await res.json()) as {
-    choices?: { message?: { content?: string | null; reasoning_content?: string | null } }[];
+    choices?: {
+      message?: {
+        content?: string | null;
+        reasoning_content?: string | null;
+        reasoning?: string | null;
+      };
+    }[];
   };
-  const msg = data.choices?.[0]?.message;
-  const content = [msg?.content, msg?.reasoning_content].filter(Boolean).join("\n");
+  const content = messageText(data.choices?.[0]?.message);
   if (!content.trim()) return null;
   return { text: content, model };
 }
 
-export async function brainRaw(user: string, timeoutMs = 22000): Promise<{ json: Record<string, unknown>; model: string } | null> {
+export async function brainRaw(
+  user: string,
+  timeoutMs = 22000,
+  maxTokens = 1400,
+): Promise<{ json: Record<string, unknown>; model: string } | null> {
   const key = process.env.FEATHERLESS_API_KEY;
   if (!key) {
     console.error("featherless: FEATHERLESS_API_KEY missing");
@@ -92,7 +136,7 @@ export async function brainRaw(user: string, timeoutMs = 22000): Promise<{ json:
   try {
     for (const model of FALLBACK_MODELS) {
       try {
-        const hit = await complete(model, key, user, ctrl.signal);
+        const hit = await complete(model, key, user, ctrl.signal, maxTokens);
         if (!hit) continue;
         const json = parseJsonObject(hit.text);
         if (json) return { json, model: hit.model };
@@ -131,6 +175,8 @@ Heuristic resource: ${input.resource}
 Heuristic severity: ${input.heuristicSeverity} (${input.heuristicScore})
 Candidate desks:
 ${desks || "(none on file)"}`,
+    22000,
+    2000,
   );
   if (!hit) return null;
   const j = hit.json;
@@ -202,24 +248,38 @@ export async function clerkClaim(input: {
   title: string;
   location: string;
   severity: Severity;
+  resource?: string;
   nearest?: IncidentNear[];
   helperName: string;
   helperOrg: string;
   helperKind: SupportKind;
   helperEmail: string;
   helperKm?: number;
+  aiPick?: string;
+  candidates?: { callsign: string; etaMin: number; fit: number; equipment: string[]; available: boolean }[];
 }): Promise<ClaimClerk | null> {
+  const teams = (input.candidates ?? [])
+    .slice(0, 8)
+    .map(
+      (c) =>
+        `${c.callsign} eta ${c.etaMin} fit ${c.fit} gear ${c.equipment.join(",")} ${c.available ? "free" : "busy"}`,
+    )
+    .join("; ");
   const hit = await brainRaw(
-    `A field unit pressed Help on a ticket. Decide if they may take it. Return JSON:
-{"allow":true|false,"summary":"one or two sentences","confidence":0-1}
+    `A field unit pressed Help on a ticket. Decide if they may take it. Do not use nearest-only. Weight skills/equipment vs this need, danger, and travel.
+Return JSON:
+{"allow":true|false,"summary":"one or two sentences, include why this unit or why hold for a better team","confidence":0-1}
 
-Allow if they are a plausible responder (listed in nearest, or close, or no one closer). Hold if someone much nearer exists and this unit is far, or if the ticket is already a mismatch (e.g. medical only and they are clearly not medical — still allow if they are the only unit).
+Allow if they can actually do the work (or no capable unit is free). Hold if a seeded rescue team is a clearly better match and free (e.g. flood-rescue gear for rooftop evac) while this helper is a mismatch or much less capable.
 
 Ticket: ${input.title}
+Need: ${input.resource || "unspecified"}
 Place: ${input.location}
 Severity: ${input.severity}
+Clerk pick already: ${input.aiPick || "none"}
 Nearest desks: ${(input.nearest ?? []).map((n) => `${n.orgName} ${n.km}km`).join("; ") || "none"}
-Unit: ${input.helperOrg} (${input.helperKind}) ${input.helperName} ${input.helperEmail}
+Seed teams: ${teams || "none"}
+Unit pressing Help: ${input.helperOrg} (${input.helperKind}) ${input.helperName} ${input.helperEmail}
 Distance km: ${input.helperKm ?? "unknown"}`,
     14000,
   );
@@ -231,6 +291,224 @@ Distance km: ${input.helperKm ?? "unknown"}`,
     confidence: typeof j.confidence === "number" ? j.confidence : 0.5,
     model: hit.model,
   };
+}
+
+export type RescuePickRow = {
+  incidentId: string;
+  resourceId: string;
+  reason: string;
+  etaMin?: number;
+};
+
+export type RerouteClerk = {
+  affected: { incidentId: string; why: string }[];
+  alternatives: string[];
+  picks: RescuePickRow[];
+  headline: string;
+  model?: string;
+};
+
+export async function assignRescueTeams(input: {
+  incidents: { id: string; title: string; resource: string; severity: Severity; locationLabel: string }[];
+  candidatesByIncident: Record<string, DispatchCandidate[]>;
+}): Promise<{ picks: RescuePickRow[]; model: string } | null> {
+  const blocks = input.incidents
+    .map((inc) => {
+      const cands = (input.candidatesByIncident[inc.id] ?? [])
+        .filter((c) => c.available)
+        .slice(0, 8)
+        .map(
+          (c) =>
+            `${c.resourceId}|${c.callsign}|skills:${c.skills.join(",")}|gear:${c.equipment.join(",")}|eta:${c.etaMin}|fit:${c.fit}|danger:${c.danger}|status:${c.status}|blockedPath:${c.blockedOnPath.join(",") || "none"}`,
+        )
+        .join("\n");
+      return `INC ${inc.id} | ${inc.title} | need:${inc.resource} | ${inc.severity} | ${inc.locationLabel}\n${cands || "(no free units)"}`;
+    })
+    .join("\n\n");
+  const hit = await brainRaw(
+    `Assign rescue units. Do NOT pick nearest-only. Weight skills, equipment, availability, danger on path, and travel time. Prefer a capable unit 10–20 min farther over a nearer mismatch. Reason must look like: "Team 4 is best because flood-rescue equipment, 12 min."
+Return JSON:
+{"picks":[{"incidentId":"...","resourceId":"T4","reason":"Team 4 is best because flood-rescue equipment, 12 min.","etaMin":12}]}
+
+Skip an incident if no capable free unit. resourceId must be from that incident's list.
+
+${blocks}`,
+    24000,
+    1800,
+  );
+  if (!hit) return null;
+  const raw = hit.json.picks;
+  if (!Array.isArray(raw)) return null;
+  const picks: RescuePickRow[] = raw
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const incidentId = String(r.incidentId ?? "");
+      const resourceId = String(r.resourceId ?? "");
+      const reason = String(r.reason ?? "").trim();
+      if (!incidentId || !resourceId || !reason) return null;
+      const pick: RescuePickRow = { incidentId, resourceId, reason };
+      if (typeof r.etaMin === "number") pick.etaMin = r.etaMin;
+      return pick;
+    })
+    .filter((x): x is RescuePickRow => Boolean(x));
+  if (!picks.length) return null;
+  return { picks, model: hit.model };
+}
+
+export async function planReroute(input: {
+  blockedLabel: string;
+  blockedRoadIds: string[];
+  affected: { incidentId: string; title: string; roads: string[]; oldEta: number; oldUnit: string }[];
+  incidents: { id: string; title: string; resource: string; severity: Severity; locationLabel: string }[];
+  candidatesByIncident: Record<string, DispatchCandidate[]>;
+}): Promise<RerouteClerk | null> {
+  const hit = await brainRaw(
+    `A corridor just closed. Identify affected missions, name alternatives, reassign capable units, give new ETAs. Not nearest-only.
+Return JSON:
+{"headline":"one sentence for the desk","affected":[{"incidentId":"...","why":"path used NH-16"}],"alternatives":["use Bandar Road via GGH"],"picks":[{"incidentId":"...","resourceId":"...","reason":"Boat 5 is best because boats, 18 min after NH-16 close.","etaMin":18}]}
+
+Closed: ${input.blockedLabel} (${input.blockedRoadIds.join(", ") || "unknown"})
+Hit missions:
+${input.affected.map((a) => `${a.incidentId} ${a.title} was ${a.oldUnit} eta ${a.oldEta} via ${a.roads.join("/")}`).join("\n") || "(none listed)"}
+
+Open / rerouted tickets and units:
+${input.incidents
+  .map((inc) => {
+    const cands = (input.candidatesByIncident[inc.id] ?? [])
+      .filter((c) => c.available)
+      .slice(0, 8)
+      .map((c) => `${c.resourceId}|${c.callsign}|eta:${c.etaMin}|fit:${c.fit}|gear:${c.equipment.join(",")}|blocked:${c.blockedOnPath.join(",") || "no"}`)
+      .join("; ");
+    return `${inc.id} ${inc.title} ${inc.severity} @ ${inc.locationLabel} :: ${cands}`;
+  })
+  .join("\n")}`,
+    24000,
+    1800,
+  );
+  if (!hit) return null;
+  const j = hit.json;
+  const picksRaw = Array.isArray(j.picks) ? j.picks : [];
+  const picks: RescuePickRow[] = picksRaw
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const incidentId = String(r.incidentId ?? "");
+      const resourceId = String(r.resourceId ?? "");
+      const reason = String(r.reason ?? "").trim();
+      if (!incidentId || !resourceId || !reason) return null;
+      const pick: RescuePickRow = { incidentId, resourceId, reason };
+      if (typeof r.etaMin === "number") pick.etaMin = r.etaMin;
+      return pick;
+    })
+    .filter((x): x is RescuePickRow => Boolean(x));
+  return {
+    headline: String(j.headline ?? "Corridor closed — missions reassigned.").trim(),
+    affected: Array.isArray(j.affected)
+      ? j.affected
+          .map((row) => {
+            if (!row || typeof row !== "object") return null;
+            const r = row as Record<string, unknown>;
+            return { incidentId: String(r.incidentId ?? ""), why: String(r.why ?? "") };
+          })
+          .filter((x): x is { incidentId: string; why: string } => Boolean(x?.incidentId))
+      : [],
+    alternatives: Array.isArray(j.alternatives) ? j.alternatives.map(String).slice(0, 6) : [],
+    picks,
+    model: hit.model,
+  };
+}
+
+export async function rankRepairs(input: {
+  assets: InfraAsset[];
+  hazards: Hazard[];
+}): Promise<{ rows: Pick<InfraAsset, "id" | "score" | "reason" | "consequences">[]; model: string } | null> {
+  const blocked = input.hazards.filter((h) => h.status === "blocked").map((h) => `${h.roadId} (${h.label})`);
+  const hit = await brainRaw(
+    `Rank damaged roads/bridges for repair first. Combine damage, traffic, hospital access, evac routes, population, and knock-on if left broken.
+Return JSON:
+{"repairs":[{"id":"INF-NH16","score":0-100,"reason":"one sentence why this is first or next","consequences":["if delayed, ..."]}]}
+
+Use only these ids. Higher score = repair sooner.
+
+Assets:
+${input.assets
+  .map(
+    (a) =>
+      `${a.id} | ${a.name} | ${a.kind} | road ${a.roadId} | damage ${a.damage} traffic ${a.traffic} hospital ${a.hospitalAccess} evac ${a.evacRoute} population ${a.population} | now ${a.status}`,
+  )
+  .join("\n")}
+
+Currently blocked: ${blocked.join("; ") || "none"}`,
+    22000,
+    1600,
+  );
+  if (!hit) return null;
+  const raw = hit.json.repairs;
+  if (!Array.isArray(raw)) return null;
+  const rows = raw
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const id = String(r.id ?? "");
+      if (!id) return null;
+      return {
+        id,
+        score: typeof r.score === "number" ? r.score : 0,
+        reason: String(r.reason ?? "").trim(),
+        consequences: Array.isArray(r.consequences) ? r.consequences.map(String).slice(0, 4) : [],
+      };
+    })
+    .filter((x): x is Pick<InfraAsset, "id" | "score" | "reason" | "consequences"> => Boolean(x));
+  if (!rows.length) return null;
+  return { rows, model: hit.model };
+}
+
+export async function predictBefore(input: {
+  resources: ResourceAsset[];
+  incidents?: Incident[];
+  hazards?: Hazard[];
+  timeoutMs?: number;
+}): Promise<BeforeBrief | null> {
+  const fallback = fallbackBrief(input);
+  const units = input.resources
+    .map(
+      (r) =>
+        `${r.id} ${r.callsign} ${r.kind} @${r.locationId} ${r.status} skills=${r.skills.join("/")} gear=${r.equipment.join("/")}`,
+    )
+    .join("\n");
+  const open = (input.incidents ?? [])
+    .filter((i) => i.status !== "resolved")
+    .map((i) => `${i.id} ${i.severity} @${i.locationId} ${i.title}`)
+    .join("\n");
+  const blocked = (input.hazards ?? [])
+    .filter((h) => h.status === "blocked")
+    .map((h) => `${h.roadId} ${h.label}`)
+    .join("; ");
+  const hit = await brainRaw(
+    `${sectorContextText()}
+
+UNITS ON THE BOARD (use these ids only for moves):
+${units || "(none)"}
+
+OPEN TICKETS:
+${open || "(quiet)"}
+
+BLOCKED ROADS: ${blocked || "none"}
+
+You are planning BEFORE the cyclone makes landfall. Return JSON only:
+{"headline":"one sentence like: Ward 17 has unusually high flood risk over the next 24–48 hours.","windowHours":48,"orders":"one sentence: Before the cyclone arrives, move N rescue boats, N medical teams and N water tankers to these locations.","risks":[{"wardId":"W17","wardName":"...","level":"high"|"elevated"|"watch","horizonHours":36,"blurb":"one sentence","drivers":["rainfall","terrain","history","population"]}],"vulnerable":[{"kind":"school"|"hospital"|"elderly"|"road"|"substation"|"shelter","name":"...","wardId":"...","why":"operational hit","action":"first move"}],"moves":[{"resourceId":"BOAT-5","callsign":"...","fromId":"W5","toId":"W17","toLabel":"...","why":"why this unit to this site"}]}
+
+Rules: reason from rainfall, terrain, flood history, and population. Name Krishna-delta wards that exist above. Vulnerability is an operational list, not a map. Pre-position only free units. Prefer boats to W17/W3/W4/SH-C, medical to W17 and HOSP, tankers to shelters and canal belt. Do not invent resource ids.`,
+    input.timeoutMs ?? 32000,
+    2200,
+  );
+  if (!hit) return null;
+  const brief = coerceBrief(hit.json, fallback);
+  brief.model = hit.model;
+  if (!brief.risks.length) brief.risks = fallback.risks;
+  if (!brief.headline) return null;
+  return brief;
 }
 
 export function reasonFromStudy(study: ReportStudy): IncidentReason {

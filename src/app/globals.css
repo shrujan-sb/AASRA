@@ -168,7 +168,17 @@ a { color: inherit; text-decoration: none; }
   padding: 16px 18px 16px 22px;
 }
 
-.flash-in { animation: inkIn 0.45s ease-out; }
+.ops-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--ink);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ops-tag-verified { color: var(--ok); border-color: var(--ok); }
+.ops-tag-uncertain { color: var(--mute); }
+.ops-tag-conflicting { color: var(--crit); border-color: var(--crit); }
 
 @keyframes inkIn {
   from { background: #ead7c8; }

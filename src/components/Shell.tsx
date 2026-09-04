@@ -10,10 +10,11 @@ import { useOps } from "@/lib/useOps";
 
 const NAV = [
   { href: "/console", label: "Needs", hint: "Ranked tickets" },
+  { href: "/console/predict", label: "Predict", hint: "Before landfall" },
   { href: "/console/feed", label: "Wire", hint: "Raw intake" },
   { href: "/console/map", label: "Map", hint: "Ground picture" },
   { href: "/console/allocate", label: "Teams", hint: "Who is out" },
-  { href: "/console/cascade", label: "Knock-on", hint: "Grid / pumps" },
+  { href: "/console/cascade", label: "Knock-on", hint: "Repair order" },
   { href: "/console/approvals", label: "Approvals", hint: "Gov & NGO" },
   { href: "/console/admins", label: "Keys", hint: "Who can sign in" },
 ];

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { listen } from "@/lib/db";
-import type { AgentLog, Assignment, Hazard, Incident, InboxMessage, ResourceAsset, Sitrep, StructuredEvent } from "@/lib/types";
+import type { AgentLog, Assignment, Hazard, Incident, InboxMessage, InfraAsset, ResourceAsset, Sitrep, StructuredEvent } from "@/lib/types";
 
 export function useOps() {
   const [inbox, setInbox] = useState<InboxMessage[]>([]);
@@ -13,6 +13,7 @@ export function useOps() {
   const [hazards, setHazards] = useState<Hazard[]>([]);
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [sitrep, setSitrep] = useState<Sitrep | null>(null);
+  const [infra, setInfra] = useState<InfraAsset[]>([]);
 
   useEffect(() => {
     const u: Array<() => void> = [
@@ -24,6 +25,7 @@ export function useOps() {
       listen("hazards", setHazards),
       listen("agentLogs", setLogs),
       listen<Sitrep>("sitrep", (rows) => setSitrep(rows.find((r) => r.id === "current") ?? null)),
+      listen("infra", setInfra),
     ];
     return () => u.forEach((fn) => fn());
   }, []);
@@ -40,5 +42,6 @@ export function useOps() {
     hazards,
     logs: [...logs].sort((a, b) => b.at - a.at).slice(0, 40),
     sitrep,
+    infra: [...infra].sort((a, b) => (b.score || 0) - (a.score || 0) || a.rank - b.rank),
   };
 }

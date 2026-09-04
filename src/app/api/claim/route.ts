@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { clerkClaim } from "@/lib/featherless";
-import type { Incident, IncidentHelper, IncidentNear, Severity } from "@/lib/types";
+import type { DispatchCandidate, Incident, IncidentHelper, IncidentNear, Severity } from "@/lib/types";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
-    incident?: Pick<Incident, "id" | "title" | "locationLabel" | "severity" | "nearest" | "helper">;
+    incident?: Pick<Incident, "id" | "title" | "locationLabel" | "severity" | "nearest" | "helper" | "resource" | "aiPick">;
     helper?: IncidentHelper;
     km?: number;
+    candidates?: DispatchCandidate[];
   };
   const incident = body.incident;
   const helper = body.helper;
@@ -25,12 +26,21 @@ export async function POST(req: Request) {
     title: incident.title,
     location: incident.locationLabel,
     severity: (["critical", "high", "normal"].includes(incident.severity) ? incident.severity : "normal") as Severity,
+    resource: incident.resource,
     nearest: incident.nearest as IncidentNear[] | undefined,
     helperName: helper.name,
     helperOrg: helper.orgName,
     helperKind: helper.kind,
     helperEmail: helper.email,
     helperKm: typeof body.km === "number" ? body.km : undefined,
+    aiPick: incident.aiPick?.reason,
+    candidates: body.candidates?.map((c) => ({
+      callsign: c.callsign,
+      etaMin: c.etaMin,
+      fit: c.fit,
+      equipment: c.equipment,
+      available: c.available,
+    })),
   });
 
   if (!clerk) {

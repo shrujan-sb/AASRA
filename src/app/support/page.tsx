@@ -10,12 +10,13 @@ import { useOps } from "@/lib/useOps";
 import { claimIncidentHelp, listenApprovedSupport } from "@/lib/support";
 import { kmBetween } from "@/lib/geoMath";
 import { rankNearestSupport } from "@/lib/nearest";
+import { buildCandidates } from "@/lib/dispatch";
 import type { ApprovedSupport, Incident } from "@/lib/types";
 
 export default function SupportPage() {
   const { session, ready, logout } = useAuth();
   const router = useRouter();
-  const { incidents } = useOps();
+  const { incidents, resources, hazards } = useOps();
   const [units, setUnits] = useState<ApprovedSupport[]>([]);
   const [busyId, setBusyId] = useState("");
   const [err, setErr] = useState("");
@@ -59,6 +60,7 @@ export default function SupportPage() {
         at: Date.now(),
       };
       const km = me ? dist(me, row) : undefined;
+      const candidates = buildCandidates(row, resources, hazards);
       const res = await fetch("/api/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,11 +70,14 @@ export default function SupportPage() {
             title: row.title,
             locationLabel: row.locationLabel,
             severity: row.severity,
+            resource: row.resource,
             nearest: row.nearest,
             helper: row.helper,
+            aiPick: row.aiPick,
           },
           helper,
           km,
+          candidates,
         }),
       });
       const data = (await res.json()) as { ok?: boolean; allow?: boolean; summary?: string };
@@ -80,7 +85,7 @@ export default function SupportPage() {
         setErr(data.summary || "Clerk held this claim.");
         return;
       }
-      const next = await claimIncidentHelp(row, helper);
+      const next = await claimIncidentHelp(row, helper, data.summary);
       if (next.helper && next.helper.email.toLowerCase() !== session.email.toLowerCase()) {
         setErr(`${next.helper.orgName} already took this.`);
       }
@@ -143,6 +148,9 @@ export default function SupportPage() {
                       {routed ? " · routed to you" : ""}
                     </div>
                     {i.reason?.summary && <p className="mt-2 text-[14px] leading-relaxed">{i.reason.summary}</p>}
+                    {i.aiPick && (
+                      <p className="mt-2 text-[13px] text-[var(--mute)]">Desk pick: {i.aiPick.reason}</p>
+                    )}
                     {i.nearest && i.nearest.length > 0 && (
                       <p className="mt-2 text-[13px] text-[var(--mute)]">
                         Nearest: {i.nearest.map((n) => `${n.orgName} (${n.km} km)`).join(" · ")}

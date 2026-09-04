@@ -6,7 +6,8 @@ import { PrioritizationAgent } from "@/lib/agents/prioritization";
 import { RoutingAgent } from "@/lib/agents/routing";
 import { SummaryAgent } from "@/lib/agents/summary";
 import { getAll, hydrateLocal, nid, upsert, clearAll } from "@/lib/db";
-import { SEED_RESOURCES } from "@/lib/seed";
+import { requestAssign, requestReroute, requestRepairs } from "@/lib/opsRemote";
+import { SEED_INFRA, SEED_RESOURCES } from "@/lib/seed";
 import { DRIP_POOL, FEED_SCRIPT, toInbox } from "@/lib/sim/messages";
 import type {
   AgentLog,
@@ -14,6 +15,7 @@ import type {
   Hazard,
   Incident,
   InboxMessage,
+  InfraAsset,
   ResourceAsset,
   Sitrep,
   StructuredEvent,
@@ -71,7 +73,7 @@ export async function ingestMessage(msg: InboxMessage) {
   });
   for (const r of routed.resources) await upsert("resources", r.id, r);
   for (const a of routed.assignments) await upsert("assignments", a.id, a);
-  for (const inc of getAll<Incident>("incidents")) await upsert("incidents", inc.id, inc);
+  for (const inc of routed.incidents) await upsert("incidents", inc.id, inc);
   for (const n of routed.notes) await log("routing", n);
 
   for (const ev of getAll<StructuredEvent>("events")) {
@@ -92,12 +94,23 @@ export async function ingestMessage(msg: InboxMessage) {
   });
   await upsert("sitrep", "current", sitrep);
   await log("summary", sitrep.headline);
+
+  if (event.type === "hazard_report") {
+    void requestReroute(event.locationLabel).then(() => void requestRepairs());
+  } else if (event.type === "request") {
+    scheduleClerkAssign();
+  }
 }
 
 export async function ensureSeeded() {
   hydrateLocal();
-  if (getAll<ResourceAsset>("resources").length) return;
-  for (const r of SEED_RESOURCES) await upsert("resources", r.id, r);
+  if (!getAll<ResourceAsset>("resources").length) {
+    for (const r of SEED_RESOURCES) await upsert("resources", r.id, r);
+  }
+  if (!getAll<InfraAsset>("infra").length) {
+    for (const row of SEED_INFRA) await upsert("infra", row.id, row);
+  }
+  if (getAll<Sitrep>("sitrep").length) return;
   const empty: Sitrep = {
     id: "current",
     generatedAt: Date.now(),
@@ -146,6 +159,7 @@ export async function injectRoadBlock(road = "NH-16") {
     timestamp: Date.now(),
     processed: false,
   });
+  return requestReroute(road);
 }
 
 export function resetSession() {
@@ -155,4 +169,13 @@ export function resetSession() {
     clearAll();
     window.location.reload();
   }
+}
+
+let assignTimer: number | undefined;
+function scheduleClerkAssign() {
+  if (typeof window === "undefined") return;
+  window.clearTimeout(assignTimer);
+  assignTimer = window.setTimeout(() => {
+    void requestAssign();
+  }, 1400);
 }

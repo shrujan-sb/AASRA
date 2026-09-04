@@ -1,28 +1,56 @@
 "use client";
 
+import { useState } from "react";
+import { requestAssign } from "@/lib/opsRemote";
 import { useOps } from "@/lib/useOps";
 
 export function AllocateBoard() {
   const { assignments, resources, incidents } = useOps();
+  const [busy, setBusy] = useState(false);
+
   return (
     <div className="h-full overflow-auto">
-      <header className="px-5 py-4 border-b border-[var(--ink)]">
-        <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Dispatch</p>
-        <h1 className="mt-1 text-[26px] font-semibold leading-none">Teams</h1>
+      <header className="px-5 py-4 border-b border-[var(--ink)] flex items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Dispatch</p>
+          <h1 className="mt-1 text-[26px] font-semibold leading-none">Teams</h1>
+          <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
+            Clerk matches skills, gear, danger on path, and travel — not nearest-only.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          className="h-9 px-3 border border-[var(--ink)] bg-white text-[13px] disabled:opacity-50"
+          onClick={() => {
+            setBusy(true);
+            void requestAssign().finally(() => setBusy(false));
+          }}
+        >
+          {busy ? "Clerk matching…" : "Ask clerk"}
+        </button>
       </header>
       <ul>
         {resources.map((r) => {
           const a = assignments.find((x) => x.resourceId === r.id && x.status === "active");
           const inc = incidents.find((i) => i.id === a?.incidentId);
+          const why = inc?.aiPick?.reason || a?.reason;
           return (
-            <li key={r.id} className="flex items-center gap-4 px-5 py-3 border-b border-[var(--rule)]">
-              <span className="w-40 font-medium">{r.callsign}</span>
-              <span className={r.status === "free" ? "w-24 text-[var(--ok)]" : "w-24 text-[var(--warn)]"}>
-                {r.status === "free" ? "free" : "out"}
-              </span>
-              <span className="flex-1 min-w-0 truncate text-[var(--mute)]">
-                {inc ? `${inc.title} · ${a?.etaMin} min` : "—"}
-              </span>
+            <li key={r.id} className="px-5 py-3 border-b border-[var(--rule)]">
+              <div className="flex items-center gap-4">
+                <span className="w-40 font-medium">{r.callsign}</span>
+                <span className={r.status === "free" ? "w-24 text-[var(--ok)]" : "w-24 text-[var(--warn)]"}>
+                  {r.status === "free" ? "free" : "out"}
+                </span>
+                <span className="flex-1 min-w-0 truncate text-[var(--mute)]">
+                  {inc ? `${inc.title} · ${a?.etaMin} min` : "—"}
+                </span>
+              </div>
+              <p className="mt-1 text-[13px] text-[var(--mute)]">
+                {r.skills.join(", ")}
+                {r.equipment.length ? ` · ${r.equipment.join(", ")}` : ""}
+              </p>
+              {why && <p className="mt-1 text-[14px]">{why}</p>}
             </li>
           );
         })}

@@ -96,10 +96,21 @@ export function CommandBoard() {
                   <span className={`mt-1 h-3 w-3 shrink-0 ${sevDot(i.severity)}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium leading-snug">{i.title}</div>
-                    <div className="mt-1 text-[13px] text-[var(--mute)]">
-                      {i.locationLabel} · {i.verification}
-                      {i.reason ? " · studied" : ""}
-                      {i.helper ? ` · ${i.helper.orgName}` : ""}
+                    <div className="mt-1 text-[13px] text-[var(--mute)] flex flex-wrap items-center gap-2">
+                      <span>{i.locationLabel}</span>
+                      <span
+                        className={
+                          i.verification === "verified"
+                            ? "ops-tag ops-tag-verified"
+                            : i.verification === "conflicting"
+                              ? "ops-tag ops-tag-conflicting"
+                              : "ops-tag ops-tag-uncertain"
+                        }
+                      >
+                        {i.verification}
+                      </span>
+                      {i.reason ? <span>· studied</span> : null}
+                      {i.helper ? <span>· {i.helper.orgName}</span> : null}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -145,14 +156,35 @@ export function CommandBoard() {
                 </div>
                 <div>
                   <dt className="text-[var(--mute)]">Check</dt>
-                  <dd>{current.verification}</dd>
+                  <dd>
+                    <span
+                      className={
+                        current.verification === "verified"
+                          ? "ops-tag ops-tag-verified"
+                          : current.verification === "conflicting"
+                            ? "ops-tag ops-tag-conflicting"
+                            : "ops-tag ops-tag-uncertain"
+                      }
+                    >
+                      {current.verification}
+                    </span>
+                  </dd>
                 </div>
               </dl>
               {event && (
                 <p className="mt-4 text-[14px] leading-relaxed border-t border-[var(--rule)] pt-3">{event.rawText}</p>
               )}
               {match && (
-                <p className="mt-3 text-[13px] text-[var(--mute)]">Match: {match.reason}</p>
+                <p className="mt-3 text-[13px]">{match.reason}</p>
+              )}
+              {current.aiPick && (
+                <p className="mt-2 text-[14px] font-medium">
+                  Clerk pick: {current.aiPick.reason}
+                  {current.aiPick.model ? ` · ${current.aiPick.model}` : ""}
+                </p>
+              )}
+              {current.claimNote && (
+                <p className="mt-2 text-[13px] text-[var(--mute)]">Help claim: {current.claimNote}</p>
               )}
               {current.helper && (
                 <p className="mt-3 text-[15px] font-medium">

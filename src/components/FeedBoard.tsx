@@ -1,6 +1,7 @@
 "use client";
 
 import { useOps } from "@/lib/useOps";
+import type { VerificationTag } from "@/lib/types";
 
 export function FeedBoard() {
   const { inbox, events, logs } = useOps();
@@ -26,9 +27,16 @@ export function FeedBoard() {
                 </div>
                 <p className="mt-2 text-[15px] leading-relaxed">{m.rawText}</p>
                 {ev && (
-                  <p className="mt-2 text-[13px] text-[var(--mute)]">
-                    {ev.verification} · {ev.quantity} {ev.resource} · {ev.locationLabel}
-                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-[var(--mute)]">
+                    <VerifyStamp tag={ev.verification} />
+                    <span className="ops-tag">{ev.stage}</span>
+                    <span className="ops-tag">{ev.type.replace("_", " ")}</span>
+                    <span>
+                      {ev.quantity} {ev.resource} · {ev.locationLabel}
+                    </span>
+                    {ev.language !== "en" && <span>[{ev.language}→en]</span>}
+                    {ev.hazardStatus && ev.hazardStatus !== "unknown" && <span>{ev.hazardStatus}</span>}
+                  </div>
                 )}
               </li>
             );
@@ -53,4 +61,10 @@ export function FeedBoard() {
       </section>
     </div>
   );
+}
+
+function VerifyStamp({ tag }: { tag: VerificationTag }) {
+  const cls =
+    tag === "verified" ? "ops-tag ops-tag-verified" : tag === "conflicting" ? "ops-tag ops-tag-conflicting" : "ops-tag ops-tag-uncertain";
+  return <span className={cls}>{tag}</span>;
 }

@@ -40,6 +40,14 @@ export type InboxMessage = {
   processed: boolean;
 };
 
+export type IncidentPick = {
+  resourceId: string;
+  callsign: string;
+  reason: string;
+  etaMin: number;
+  model?: string;
+};
+
 export type Incident = {
   id: string;
   eventId: string;
@@ -61,6 +69,8 @@ export type Incident = {
   lng?: number;
   helper?: IncidentHelper;
   nearest?: IncidentNear[];
+  aiPick?: IncidentPick;
+  claimNote?: string;
 };
 
 export type IncidentReason = {
@@ -123,6 +133,66 @@ export type Hazard = {
   sourceEventId: string;
 };
 
+export type InfraAsset = {
+  id: string;
+  name: string;
+  kind: "road" | "bridge" | "flyover";
+  roadId: string;
+  damage: number;
+  traffic: number;
+  hospitalAccess: number;
+  evacRoute: number;
+  population: number;
+  status: "open" | "damaged" | "blocked";
+  rank: number;
+  score: number;
+  reason: string;
+  consequences: string[];
+  updatedAt: number;
+  model?: string;
+};
+
+export type PrepRiskLevel = "high" | "elevated" | "watch";
+
+export type PrepAssetKind = "school" | "hospital" | "elderly" | "road" | "substation" | "shelter";
+
+export type PrepRisk = {
+  wardId: string;
+  wardName: string;
+  level: PrepRiskLevel;
+  horizonHours: number;
+  blurb: string;
+  drivers: string[];
+};
+
+export type PrepVulnerable = {
+  kind: PrepAssetKind;
+  name: string;
+  wardId: string;
+  why: string;
+  action: string;
+};
+
+export type PrepMove = {
+  resourceId: string;
+  callsign: string;
+  fromId: string;
+  toId: string;
+  toLabel: string;
+  why: string;
+};
+
+export type BeforeBrief = {
+  headline: string;
+  windowHours: number;
+  orders: string;
+  risks: PrepRisk[];
+  vulnerable: PrepVulnerable[];
+  moves: PrepMove[];
+  model?: string;
+  fallback?: boolean;
+};
+
 export type Sitrep = {
   id: "current";
   generatedAt: number;
@@ -143,6 +213,22 @@ export type AgentLog = {
   at: number;
   message: string;
   refId?: string;
+};
+
+export type DispatchCandidate = {
+  resourceId: string;
+  callsign: string;
+  kind: ResourceKind;
+  skills: string[];
+  equipment: string[];
+  status: ResourceStatus;
+  locationId: string;
+  etaMin: number;
+  fit: number;
+  danger: number;
+  available: boolean;
+  viaRoadIds: string[];
+  blockedOnPath: string[];
 };
 
 export type SupportApplication = {
