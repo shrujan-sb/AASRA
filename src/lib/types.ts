@@ -69,6 +69,7 @@ export type IncidentReason = {
   actions: string[];
   peopleEstimate?: number;
   confidence?: number;
+  decision?: string;
   model?: string;
 };
 
@@ -164,6 +165,14 @@ export type SupportApplication = {
   status: ApplicationStatus;
   createdAt: number;
   decidedAt?: number;
+  clerk?: {
+    allow: boolean;
+    summary: string;
+    flags: string[];
+    confidence: number;
+    autoStamped?: boolean;
+    model?: string;
+  };
 };
 
 export type ApprovedSupport = {

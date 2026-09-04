@@ -21,12 +21,12 @@ const STEPS = [
   {
     n: "03",
     t: "Prioritisation",
-    d: "Policy weights (life, access, stores) rank the queue. First-in is not automatically first-out.",
+    d: "The clerk sets severity and score. Life-safety beats blankets. Heuristics fill in only if the clerk is offline.",
   },
   {
     n: "04",
     t: "Routing",
-    d: "Boats, medics, and dry goods are matched to open incidents. A blocked road can force a reroute on the map.",
+    d: "Nearest approved government, NGO, or volunteer from their registered area. Help claims the ticket; the clerk can hold a bad claim.",
   },
   {
     n: "05",
@@ -40,10 +40,10 @@ export default function HowPage() {
     <Site>
       <article className="site-wrap py-14">
         <p className="text-[13px] tracking-[0.2em] uppercase text-[var(--mute)]">Pipeline</p>
-        <h1 className="mt-3 max-w-[20ch] text-[36px] font-semibold tracking-tight">Five agents, one board</h1>
+        <h1 className="mt-3 max-w-[20ch] text-[36px] font-semibold tracking-tight">Clerk, then the board</h1>
         <p className="mt-5 max-w-[60ch] text-[18px] leading-relaxed text-[var(--mute)]">
-          Officers do not chat with a model. Each agent is a named step with a log line. You can watch the same ticket
-          travel from Messages to Needs to Teams.
+          The duty clerk reads every public report, ranks it, and points the nearest desk. Officers do not chat with a
+          model. Each step still leaves a log line you can watch from Messages to Needs to Teams.
         </p>
         <ol className="mt-12 divide-y divide-[var(--ink)] border-y border-[var(--ink)]">
           {STEPS.map((s) => (

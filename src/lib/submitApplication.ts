@@ -19,8 +19,9 @@ export async function submitSupportApplication(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(application),
   });
-  const data = (await res.json()) as { ok?: boolean; error?: string };
+  const data = (await res.json()) as { ok?: boolean; error?: string; application?: SupportApplication };
   if (!res.ok && !data.ok) {
     throw new Error(data.error || "Could not submit application.");
   }
+  if (data.application) applyApplication(data.application);
 }

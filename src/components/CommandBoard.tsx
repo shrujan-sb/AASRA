@@ -181,6 +181,9 @@ export function CommandBoard() {
               {err && <p className="mt-2 text-[13px] text-[var(--crit)]">{err}</p>}
               {current.reason ? (
                 <>
+                  {current.reason.decision && (
+                    <p className="mt-3 text-[15px] font-semibold">{current.reason.decision}</p>
+                  )}
                   <p className="mt-3 text-[15px] leading-relaxed">{current.reason.summary}</p>
                   {current.reason.risks.length > 0 && (
                     <div className="mt-3">

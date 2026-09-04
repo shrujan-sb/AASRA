@@ -56,7 +56,7 @@ export function ApprovalsBoard() {
         <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Gate</p>
         <h1 className="mt-1 text-[26px] font-semibold leading-none">Approvals</h1>
         <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
-          Government and NGO chits. Allow or reject; that Gmail gets the desk letter.
+          Government and NGO chits. The clerk reads the file first. You can still override.
         </p>
         {notice && <p className="mt-2 text-[15px]">{notice}</p>}
       </header>
@@ -80,6 +80,16 @@ export function ApprovalsBoard() {
               {r.registrationNo ? `Reg ${r.registrationNo}` : ""} {r.phone ?? ""}
             </div>
             {r.note && <p className="mt-2">{r.note}</p>}
+            {r.clerk && (
+              <div className="mt-3 border border-[var(--ink)] bg-[var(--paper)] px-3 py-3 text-[14px]">
+                <p className="text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">Clerk ruling</p>
+                <p className="mt-1 font-semibold">{r.clerk.allow ? "Allow" : "Hold"} · {Math.round(r.clerk.confidence * 100)}%</p>
+                <p className="mt-1">{r.clerk.summary}</p>
+                {r.clerk.flags?.length ? (
+                  <p className="mt-1 text-[var(--mute)]">{r.clerk.flags.join(" · ")}</p>
+                ) : null}
+              </div>
+            )}
             {r.photoDataUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={r.photoDataUrl} alt="ID" className="mt-3 max-h-56 object-contain border border-[var(--rule)]" />

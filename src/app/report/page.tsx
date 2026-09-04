@@ -124,7 +124,7 @@ export default function ReportPage() {
             <button type="button" disabled={busy} onClick={() => void demo()} className="site-btn site-btn-paper mt-2 w-full disabled:opacity-50">
               Demo report
             </button>
-            {sent && <p className="mt-3 text-[var(--ok)]">On the desk. Open Needs in the admin portal.</p>}
+            {sent && <p className="mt-3 text-[var(--ok)]">Clerk has the ticket. Open Needs, or wait for the nearest desk.</p>}
             {err && <p className="mt-3 text-[var(--crit)]">{err}</p>}
           </div>
 

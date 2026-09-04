@@ -51,13 +51,36 @@ export default function SupportPage() {
     setErr("");
     setBusyId(row.id);
     try {
-      const next = await claimIncidentHelp(row, {
+      const helper = {
         email: session.email,
         name: session.name,
         orgName: org,
         kind: me?.kind ?? "ngo",
         at: Date.now(),
+      };
+      const km = me ? dist(me, row) : undefined;
+      const res = await fetch("/api/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          incident: {
+            id: row.id,
+            title: row.title,
+            locationLabel: row.locationLabel,
+            severity: row.severity,
+            nearest: row.nearest,
+            helper: row.helper,
+          },
+          helper,
+          km,
+        }),
       });
+      const data = (await res.json()) as { ok?: boolean; allow?: boolean; summary?: string };
+      if (!res.ok || data.allow === false) {
+        setErr(data.summary || "Clerk held this claim.");
+        return;
+      }
+      const next = await claimIncidentHelp(row, helper);
       if (next.helper && next.helper.email.toLowerCase() !== session.email.toLowerCase()) {
         setErr(`${next.helper.orgName} already took this.`);
       }
