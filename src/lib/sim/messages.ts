@@ -24,6 +24,16 @@ export const FEED_SCRIPT: Scripted[] = [
   { delayMs: 60000, source: "NDRF recon", rawText: "Kanakadurga flyover open, hospital access from Governorpet clear" },
 ];
 
+export const DRIP_POOL: Scripted[] = [
+  { delayMs: 0, source: "Ward 3 volunteer", rawText: "need 40 food kits Ward 3 Krishnalanka, kitchen flooded" },
+  { delayMs: 0, source: "NGO AshaNet", rawText: "have 1 truck free Ward 7, blankets onboard" },
+  { delayMs: 0, source: "Citizen · Eluru Road", rawText: "Eluru Road blocked near Gunadala, water over kerb" },
+  { delayMs: 0, source: "Traffic police", rawText: "Eluru Road open, two lanes cleared" },
+  { delayMs: 0, source: "Shelter B warden", rawText: "Shelter B still needs water, children queueing" },
+  { delayMs: 0, source: "GGH duty desk", rawText: "need 1 generator at GGH blood bank" },
+  { delayMs: 0, source: "NDRF Team 1", rawText: "boat 5 available again after Ward 19 drop" },
+];
+
 export function toInbox(row: Scripted, now: number): InboxMessage {
   return {
     id: `IN-${now}-${Math.random().toString(36).slice(2, 6)}`,
