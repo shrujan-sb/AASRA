@@ -1,6 +1,7 @@
 "use client";
 
 import { ROADS, WARDS } from "@/lib/geo";
+import { injectRoadBlock } from "@/lib/pipeline";
 import { useOps } from "@/lib/useOps";
 
 export function MapBoard() {
@@ -78,9 +79,16 @@ export function MapBoard() {
           return <rect key={r.id} x={w.x - 3.2} y={w.y - 0.5} width="1" height="1" fill={r.status === "free" ? "#3d9b6e" : "#f07a22"} />;
         })}
       </svg>
-      <div className="text-[10px] text-[var(--muted)] flex gap-4 px-1">
-        <span>Node = ward · Red dash = blocked road · Cyan line = active assignment · Amber = reroute</span>
+      <div className="text-[10px] text-[var(--muted)] flex flex-wrap items-center gap-3 px-1">
+        <span>Node = ward · Red dash = blocked road · Cyan = assignment · Amber = reroute</span>
         <span className="text-[var(--crit)]">{[...blocked].join(" ") || "no closures"}</span>
+        <button
+          type="button"
+          className="ml-auto border border-[var(--crit)] text-[var(--crit)] px-2 py-1 uppercase tracking-widest hover:bg-[#3a1512]"
+          onClick={() => void injectRoadBlock("NH-16")}
+        >
+          Inject NH-16 block
+        </button>
       </div>
     </div>
   );
