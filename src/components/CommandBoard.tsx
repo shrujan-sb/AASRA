@@ -25,7 +25,11 @@ export function CommandBoard() {
         <div className="flex-1 border border-[var(--line)] bg-[var(--panel)] px-3 py-2 min-w-[240px]">
           <div className="text-[9px] tracking-[0.2em] text-[var(--muted)]">SITREP</div>
           <div className="text-[12px] mt-1">{sitrep?.headline ?? "Awaiting intake"}</div>
-          <div className="text-[10px] text-[var(--high)] mt-1">{sitrep?.predictions[0]}</div>
+          <div className="text-[10px] text-[var(--high)] mt-1">
+            {sitrep?.predictions.map((p) => (
+              <div key={p}>{p}</div>
+            ))}
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.9fr_0.9fr] gap-2 min-h-0">
