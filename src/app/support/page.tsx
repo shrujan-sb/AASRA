@@ -110,8 +110,8 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="ops-shell">
-      <aside className="ops-rail">
+    <div className="field-shell">
+      <aside className="field-rail">
         <Link href="/" className="flex items-center gap-2 px-4 pt-5 pb-4 border-b border-[var(--ink)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/mark.png" alt="" className="h-10 w-10 object-contain" />
@@ -120,31 +120,29 @@ export default function SupportPage() {
             <div className="mt-1 text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">{kindLabel}</div>
           </div>
         </Link>
-        <div className="px-4 py-3 border-b border-[var(--rule)] text-[13px]">
-          <div className="font-semibold">{org}</div>
-          <div className="mt-1 text-[var(--mute)]">{session.email}</div>
-          {me?.areaLabel && <div className="mt-2">{me.areaLabel}</div>}
-          <div className="mt-3 space-y-1">
-            <div className="flex justify-between">
-              <span className="text-[var(--mute)]">Open</span>
-              <span className="tabular-nums font-semibold">{openCount}</span>
+        <div className="ops-rail-sitrep">
+          <div className="font-semibold text-[14px]">{org}</div>
+          <div className="mt-1 text-[12px] text-[var(--mute)]">{session.email}</div>
+          {me?.areaLabel && <div className="mt-1 text-[13px]">{me.areaLabel}</div>}
+          <div className="mt-3 ops-rail-grid">
+            <div className="ops-rail-cell">
+              <span>Open</span>
+              <b>{openCount}</b>
             </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--mute)]">Routed to you</span>
-              <span className="tabular-nums font-semibold">{routed}</span>
+            <div className="ops-rail-cell">
+              <span>Routed</span>
+              <b>{routed}</b>
             </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--mute)]">You are helping</span>
-              <span className="tabular-nums font-semibold">{helping}</span>
+            <div className="ops-rail-cell">
+              <span>Helping</span>
+              <b>{helping}</b>
             </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--mute)]">Roads blocked</span>
-              <span className={`tabular-nums font-semibold ${blocked.length ? "text-[var(--crit)]" : ""}`}>
-                {blocked.length}
-              </span>
+            <div className="ops-rail-cell">
+              <span>Roads</span>
+              <b className={blocked.length ? "text-[var(--crit)]" : ""}>{blocked.length}</b>
             </div>
           </div>
-          {sitrep?.headline && <p className="mt-3 text-[12px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>}
+          {sitrep?.headline && <p className="mt-2 text-[12px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>}
         </div>
         {blocked.length > 0 && (
           <div className="px-4 py-3 border-b border-[var(--rule)] text-[13px]">
@@ -170,10 +168,10 @@ export default function SupportPage() {
           </button>
         </div>
       </aside>
-      <div className="ops-main overflow-auto bg-[var(--paper)]">
-        <header className="sticky top-0 z-10 bg-[var(--paper)] px-5 py-4 border-b border-[var(--ink)]">
-          <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Nearest first</p>
-          <h1 className="mt-1 text-[26px] font-semibold leading-none">Your tickets</h1>
+      <div className="field-main">
+        <header className="ops-head bg-[var(--paper)]">
+          <p className="ops-kicker">Nearest first</p>
+          <h1>Your tickets</h1>
           <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
             Reports closest to your area show first. Press Help to take it. After that, everyone sees who is on it.
           </p>

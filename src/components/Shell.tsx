@@ -10,15 +10,20 @@ import { useOps } from "@/lib/useOps";
 
 const NAV: { href: string; label: string; hint: string; group: string }[] = [
   { href: "/console", label: "Needs", hint: "Ranked tickets", group: "Watch" },
+  { href: "/console/priority", label: "Rank", hint: "Life-safety first", group: "Watch" },
+  { href: "/console/sitrep", label: "Sitrep", hint: "Duty brief", group: "Watch" },
   { href: "/console/predict", label: "Predict", hint: "Before landfall", group: "Watch" },
   { href: "/console/risk", label: "Risk", hint: "24–48h flood", group: "Watch" },
-  { href: "/console/feed", label: "Wire", hint: "Raw intake", group: "Watch" },
+  { href: "/console/feed", label: "Wire", hint: "Needs & offers", group: "Watch" },
+  { href: "/console/lang", label: "Language", hint: "Detect + English", group: "Watch" },
+  { href: "/console/verify", label: "Conflict", hint: "Blocked vs open", group: "Watch" },
   { href: "/console/preposition", label: "Stage", hint: "Boats / med / water", group: "Stage" },
   { href: "/console/vulnerable", label: "Vulnerable", hint: "If flood comes", group: "Stage" },
   { href: "/console/cascade", label: "Knock-on", hint: "Grid cascade", group: "Stage" },
   { href: "/console/repair", label: "Repair", hint: "Roads & bridges", group: "Stage" },
   { href: "/console/map", label: "Map", hint: "Ground picture", group: "Ground" },
   { href: "/console/allocate", label: "Teams", hint: "Who is out", group: "Ground" },
+  { href: "/console/reroute", label: "Reroute", hint: "Closed corridors", group: "Ground" },
   { href: "/console/approvals", label: "Approvals", hint: "Gov & NGO", group: "People" },
   { href: "/console/admins", label: "Keys", hint: "Who can sign in", group: "People" },
 ];
@@ -58,24 +63,24 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </Link>
 
-        <div className="px-4 py-3 border-b border-[var(--rule)] text-[13px]">
-          <div className="flex justify-between">
-            <span className="text-[var(--mute)]">Open</span>
-            <span className="tabular-nums font-semibold">{open}</span>
-          </div>
-          <div className="mt-1 flex justify-between">
-            <span className="text-[var(--mute)]">Life-safety</span>
-            <span className={`tabular-nums font-semibold ${life ? "text-[var(--crit)]" : ""}`}>{life}</span>
-          </div>
-          <div className="mt-1 flex justify-between">
-            <span className="text-[var(--mute)]">Roads blocked</span>
-            <span className={`tabular-nums font-semibold ${sitrep?.roadsBlocked ? "text-[var(--crit)]" : ""}`}>
-              {sitrep?.roadsBlocked ?? 0}
-            </span>
-          </div>
-          <div className="mt-1 flex justify-between">
-            <span className="text-[var(--mute)]">Shelters tight</span>
-            <span className="tabular-nums font-semibold">{sitrep?.sheltersNearCapacity ?? 0}</span>
+        <div className="ops-rail-sitrep">
+          <div className="ops-rail-grid">
+            <div className="ops-rail-cell">
+              <span>Open</span>
+              <b>{open}</b>
+            </div>
+            <div className="ops-rail-cell">
+              <span>Life</span>
+              <b className={life ? "text-[var(--crit)]" : ""}>{life}</b>
+            </div>
+            <div className="ops-rail-cell">
+              <span>Roads</span>
+              <b className={sitrep?.roadsBlocked ? "text-[var(--crit)]" : ""}>{sitrep?.roadsBlocked ?? 0}</b>
+            </div>
+            <div className="ops-rail-cell">
+              <span>Shelters</span>
+              <b>{sitrep?.sheltersNearCapacity ?? 0}</b>
+            </div>
           </div>
           {sitrep?.headline && (
             <p className="mt-2 text-[12px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>
@@ -98,15 +103,12 @@ export function Shell({ children }: { children: ReactNode }) {
             const on = path === n.href;
             return (
               <div key={n.href}>
-                {showGroup && <p className="ops-group">{n.group}</p>}
-                <Link
-                  href={n.href}
-                  className={`block px-4 py-2 border-l-4 ${
-                    on ? "border-[var(--crit)] bg-white font-semibold" : "border-transparent text-[var(--mute)]"
-                  }`}
-                >
-                  <div>{n.label}</div>
-                  <div className="text-[11px] font-normal tracking-wide uppercase">{n.hint}</div>
+                {showGroup && <p className="ops-nav-group">{n.group}</p>}
+                <Link href={n.href} className="ops-nav-link" data-on={on ? "true" : "false"}>
+                  <span>
+                    {n.label}
+                    <small>{n.hint}</small>
+                  </span>
                 </Link>
               </div>
             );

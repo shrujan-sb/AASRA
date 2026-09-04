@@ -13,6 +13,8 @@ export const FEED_SCRIPT: Scripted[] = [
   { delayMs: 16800, source: "Ward 19 resident", rawText: "need boat evac 20 people trapped Ward 19 Autonagar rooftops NOW" },
   { delayMs: 19200, source: "Hindi desk", languageHint: "hi", rawText: "वार्ड 5 में 80 कंबल चाहिए, बारिश जारी है" },
   { delayMs: 21800, source: "Telugu desk", languageHint: "te", rawText: "వార్డ్ 11 లో నీటి ట్యాంకర్ అవసరం, పంపులు ఆగిపోయాయి" },
+  { delayMs: 23200, source: "Hindi NGO", languageHint: "hi", rawText: "वार्ड 14 में 2 ट्रक खाली हैं, राशन भेज सकते हैं" },
+  { delayMs: 24400, source: "Citizen SMS", rawText: "pls ppl stuck near school 15 families rooftop no boat yet" },
   { delayMs: 25000, source: "AP TRANSCO", rawText: "33kV substation Patamata feeder unstable, hospital backup requested" },
   { delayMs: 28500, source: "Police traffic", rawText: "NH-16 corridor blocked at Autonagar underpass, trucks cannot pass" },
   { delayMs: 32000, source: "Volunteer pool", rawText: "have 12 medical staff available Ward 9, can deploy" },
@@ -32,6 +34,7 @@ export const DRIP_POOL: Scripted[] = [
   { delayMs: 0, source: "Shelter B warden", rawText: "Shelter B still needs water, children queueing" },
   { delayMs: 0, source: "GGH duty desk", rawText: "need 1 generator at GGH blood bank" },
   { delayMs: 0, source: "NDRF Team 1", rawText: "boat 5 available again after Ward 19 drop" },
+  { delayMs: 0, source: "Telugu volunteer", languageHint: "te", rawText: "ప్రకాశం బ్యారేజ్ రోడ్ మూసివేయబడింది, నీరు పైకి వచ్చింది" },
 ];
 
 export function toInbox(row: Scripted, now: number): InboxMessage {

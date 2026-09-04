@@ -19,5 +19,9 @@ export async function POST(req: Request) {
     processed: Boolean(body.processed),
   };
   const parsed = await IntakeAgent.runAsync(msg);
-  return NextResponse.json({ ok: true, parsed });
+  return NextResponse.json({
+    ok: true,
+    parsed,
+    studied: parsed.translated !== parsed.rawText || parsed.type === "offer",
+  });
 }
