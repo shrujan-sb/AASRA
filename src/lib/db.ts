@@ -47,6 +47,12 @@ export function hydrateLocal(): void {
   }
 }
 
+export function clearAll(): void {
+  for (const key of Object.keys(memory)) delete memory[key];
+  if (typeof window !== "undefined") localStorage.removeItem(LS_KEY);
+  listeners.forEach((set) => set.forEach((fn) => fn()));
+}
+
 export async function upsert(col: string, id: string, data: Record<string, unknown>): Promise<void> {
   const row = { ...bucket(col)[id], ...data, id } as Row;
   bucket(col)[id] = row;
@@ -66,6 +72,7 @@ export function getById<T extends { id: string }>(col: string, id: string): T | 
 }
 
 export function listen<T extends { id: string }>(col: string, cb: (rows: T[]) => void): () => void {
+  hydrateLocal();
   const run = () => cb(getAll<T>(col));
   if (!listeners.has(col)) listeners.set(col, new Set());
   listeners.get(col)!.add(run);
