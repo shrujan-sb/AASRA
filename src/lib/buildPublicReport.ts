@@ -1,6 +1,6 @@
 import { IntakeAgent } from "@/lib/agents/intake";
 import { VerificationAgent } from "@/lib/agents/verification";
-import { DEFAULT_POLICY, scoreNeed, severityFromScore } from "@/lib/policy";
+import { DEFAULT_POLICY, explainNeed, scoreNeed, severityFromScore } from "@/lib/policy";
 import { nid } from "@/lib/ids";
 import type { AgentLog, Incident, InboxMessage, StructuredEvent } from "@/lib/types";
 
@@ -12,12 +12,12 @@ export type PublicReportInput = {
   lng?: number;
 };
 
-export function buildPublicReport(input: PublicReportInput): {
+export async function buildPublicReport(input: PublicReportInput): Promise<{
   inbox: InboxMessage;
   event: StructuredEvent;
   incident: Incident;
   log: AgentLog;
-} {
+}> {
   const loc = input.location.trim();
   const need = input.need.trim();
   const pin =
@@ -30,7 +30,7 @@ export function buildPublicReport(input: PublicReportInput): {
     timestamp: Date.now(),
     processed: true,
   };
-  const parsed = IntakeAgent.run(inbox);
+  const parsed = await IntakeAgent.runAsync(inbox);
   const v = VerificationAgent.run({ incoming: parsed, corpus: [] });
   const event: StructuredEvent = {
     ...parsed,
@@ -59,7 +59,10 @@ export function buildPublicReport(input: PublicReportInput): {
     quantity: event.quantity,
     severity,
     priorityScore,
+    heuristicScore: priorityScore,
     rank: 0,
+    priorityWhy: explainNeed(event.resource, event.translated, event.quantity),
+    scoreSource: "heuristic",
     verification: event.verification,
     status: "open",
     createdAt: inbox.timestamp,

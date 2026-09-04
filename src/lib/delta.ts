@@ -1,5 +1,16 @@
 import { ROADS, WARDS, wardById } from "@/lib/geo";
-import type { BeforeBrief, Hazard, Incident, PrepAssetKind, PrepMove, ResourceAsset } from "@/lib/types";
+import type {
+  BeforeBrief,
+  Hazard,
+  Incident,
+  PrepAssetKind,
+  PrepMove,
+  PrepVulnerable,
+  PrepositionPlan,
+  PrepSite,
+  ResourceAsset,
+  VulnerableMap,
+} from "@/lib/types";
 
 export type WardProfile = {
   id: string;
@@ -76,16 +87,23 @@ ${sites}
 ROADS: ${roads}`;
 }
 
-function isBoat(r: ResourceAsset): boolean {
+export function isBoat(r: ResourceAsset): boolean {
   return r.equipment.some((e) => /boat/i.test(e)) || r.skills.some((s) => /boat/i.test(s));
 }
 
-function isMed(r: ResourceAsset): boolean {
+export function isMed(r: ResourceAsset): boolean {
   return r.kind === "medical" || r.skills.some((s) => /nurse|doctor|medic/i.test(s));
 }
 
-function isTanker(r: ResourceAsset): boolean {
+export function isTanker(r: ResourceAsset): boolean {
   return r.equipment.some((e) => /tanker|water/i.test(e)) || r.skills.includes("water");
+}
+
+export function unitRole(r: ResourceAsset): "boat" | "medical" | "tanker" | "other" {
+  if (isBoat(r)) return "boat";
+  if (isMed(r)) return "medical";
+  if (isTanker(r)) return "tanker";
+  return "other";
 }
 
 function scoreWard(id: string, hazards: Hazard[], incidents: Incident[]): number {
@@ -101,6 +119,124 @@ function scoreWard(id: string, hazards: Hazard[], incidents: Incident[]): number
   return n;
 }
 
+const STAGE_DESTS = ["W17", "W3", "W15", "SH-C"] as const;
+
+export function fallbackPreposition(input: {
+  resources: ResourceAsset[];
+  incidents?: Incident[];
+  hazards?: Hazard[];
+}): PrepositionPlan {
+  const dests = STAGE_DESTS.filter((id) => WARDS.some((w) => w.id === id));
+  const free = input.resources.filter((r) => r.status === "free");
+  const boats = free.filter(isBoat);
+  const meds = free.filter(isMed);
+  const tanks = free.filter(isTanker);
+  const nBoats = Math.min(4, boats.length);
+  const nMed = Math.min(2, meds.length);
+  const nTank = Math.min(3, tanks.length);
+  const pick = [
+    ...boats.slice(0, nBoats).map((r, i) => ({ r, to: dests[i % dests.length]!, tag: "rescue boat" as const })),
+    ...meds.slice(0, nMed).map((r, i) => ({ r, to: i === 0 ? "W17" : "HOSP", tag: "medical team" as const })),
+    ...tanks.slice(0, nTank).map((r, i) => ({ r, to: dests[(i + 1) % dests.length]!, tag: "water tanker" as const })),
+  ];
+  const moves: PrepMove[] = pick
+    .filter((m) => m.r.locationId !== m.to)
+    .map((m) => ({
+      resourceId: m.r.id,
+      callsign: m.r.callsign,
+      fromId: m.r.locationId,
+      toId: m.to,
+      toLabel: wardById(m.to).name,
+      why: `Stage ${m.tag} before the canal belt and island cut out.`,
+    }));
+  const sites: PrepSite[] = dests.map((id) => ({
+    id,
+    label: wardById(id).name,
+    why:
+      id === "W17"
+        ? "Canal belt saturates first; boats and a medical cell here cover Tenali."
+        : id === "W3"
+          ? "Island colony loses the barrage road; park boats on the west bank."
+          : id === "W15"
+            ? "Tadepalli fields take Krishna spill; tanker on the NH-16 dip."
+            : "Shelter C gate floods; water store before night.",
+  }));
+  const named = dests.map((id) => wardById(id).name).join(", ");
+  return {
+    headline: `Stage ${nBoats} boats, ${nMed} medical teams and ${nTank} tankers on the canal belt before landfall.`,
+    orders: `Before the cyclone arrives, move ${nBoats} rescue boats, ${nMed} medical teams and ${nTank} water tankers to ${named}.`,
+    boats: nBoats,
+    medical: nMed,
+    tankers: nTank,
+    sites,
+    moves,
+    fallback: true,
+  };
+}
+
+export function coercePreposition(raw: Record<string, unknown>, fallback: PrepositionPlan, resources: ResourceAsset[]): PrepositionPlan {
+  const known = new Map(resources.map((r) => [r.id, r]));
+  const moves = Array.isArray(raw.moves)
+    ? raw.moves
+        .slice(0, 20)
+        .map((row) => {
+          const r = (row ?? {}) as Record<string, unknown>;
+          const resourceId = String(r.resourceId ?? "");
+          const unit = known.get(resourceId);
+          if (!unit || unit.status !== "free") return null;
+          const toId = String(r.toId ?? "");
+          if (!toId) return null;
+          return {
+            resourceId,
+            callsign: String(r.callsign ?? unit.callsign),
+            fromId: String(r.fromId ?? unit.locationId),
+            toId,
+            toLabel: String(r.toLabel ?? wardById(toId).name),
+            why: String(r.why ?? "").trim() || "Stage before landfall.",
+          } satisfies PrepMove;
+        })
+        .filter((m): m is PrepMove => Boolean(m))
+    : fallback.moves;
+  const sites = Array.isArray(raw.sites)
+    ? raw.sites
+        .slice(0, 8)
+        .map((row) => {
+          const r = (row ?? {}) as Record<string, unknown>;
+          const id = String(r.id ?? r.toId ?? "");
+          if (!id) return null;
+          return {
+            id,
+            label: String(r.label ?? r.toLabel ?? wardById(id).name),
+            why: String(r.why ?? "").trim(),
+          } satisfies PrepSite;
+        })
+        .filter((s): s is PrepSite => Boolean(s))
+    : fallback.sites;
+  const count = (role: "boat" | "medical" | "tanker", key: string, fb: number) => {
+    const n = raw[key];
+    if (typeof n === "number" && n >= 0) return Math.round(n);
+    return moves.filter((m) => {
+      const u = known.get(m.resourceId);
+      return u ? unitRole(u) === role : false;
+    }).length || fb;
+  };
+  const boats = count("boat", "boats", fallback.boats);
+  const medical = count("medical", "medical", fallback.medical);
+  const tankers = count("tanker", "tankers", fallback.tankers);
+  const orders = String(raw.orders ?? fallback.orders).trim() || fallback.orders;
+  const headline = String(raw.headline ?? fallback.headline).trim() || fallback.headline;
+  return {
+    headline,
+    orders,
+    boats,
+    medical,
+    tankers,
+    sites: sites.length ? sites : fallback.sites,
+    moves: moves.length ? moves : fallback.moves,
+    fallback: false,
+  };
+}
+
 export function fallbackBrief(input: {
   resources: ResourceAsset[];
   incidents?: Incident[];
@@ -113,7 +249,7 @@ export function fallbackBrief(input: {
     .sort((a, b) => b.score - a.score);
   const top = ranked.slice(0, 5);
   const high = top[0]?.w ?? WARDS[0];
-  const dests = ["W17", "W3", "W15", "SH-C"].filter((id) => WARDS.some((w) => w.id === id));
+  const staging = fallbackPreposition(input);
 
   const risks: BeforeBrief["risks"] = top.map((row, i) => {
     const p = WARD_PROFILES.find((x) => x.id === row.w.id);
@@ -154,36 +290,13 @@ export function fallbackBrief(input: {
                 : "Close if overtopped; mark a detour on the desk.",
   }));
 
-  const free = input.resources.filter((r) => r.status === "free");
-  const boats = free.filter(isBoat);
-  const meds = free.filter(isMed);
-  const tanks = free.filter(isTanker);
-  const pick = [
-    ...boats.slice(0, 4).map((r, i) => ({ r, to: dests[i % dests.length]!, tag: "rescue boat" })),
-    ...meds.slice(0, 2).map((r, i) => ({ r, to: i === 0 ? "W17" : "HOSP", tag: "medical team" })),
-    ...tanks.slice(0, 3).map((r, i) => ({ r, to: dests[(i + 1) % dests.length]!, tag: "water tanker" })),
-  ];
-
-  const moves: PrepMove[] = pick
-    .filter((m) => m.r.locationId !== m.to)
-    .map((m) => ({
-      resourceId: m.r.id,
-      callsign: m.r.callsign,
-      fromId: m.r.locationId,
-      toId: m.to,
-      toLabel: wardById(m.to).name,
-      why: `Stage ${m.tag} before the canal belt and island cut out.`,
-    }));
-
-  const orders = `Before the cyclone arrives, move ${Math.min(4, boats.length)} rescue boats, ${Math.min(2, meds.length)} medical teams and ${Math.min(3, tanks.length)} water tankers to ${dests.map((id) => wardById(id).name).join(", ")}.`;
-
   return {
     headline: `${high.name} has unusually high flood risk over the next 24–48 hours.`,
     windowHours: 48,
-    orders,
+    orders: staging.orders,
     risks,
     vulnerable,
-    moves,
+    moves: staging.moves,
     fallback: true,
   };
 }
@@ -242,6 +355,77 @@ export function coerceBrief(raw: Record<string, unknown>, fallback: BeforeBrief)
     risks: risks.filter((r) => r.wardId && r.blurb),
     vulnerable: vulnerable.filter((v) => v.name),
     moves: moves.filter((m) => m.resourceId && m.toId),
+    fallback: false,
+  };
+}
+
+export const PREP_KINDS: PrepAssetKind[] = ["school", "hospital", "elderly", "road", "substation", "shelter"];
+
+function siteAction(kind: PrepAssetKind): string {
+  if (kind === "shelter") return "Stage water and check gate height before night.";
+  if (kind === "hospital") return "Keep one dry approach open; park a medical cell on the rise.";
+  if (kind === "elderly") return "List non-ambulant residents; boat-ready by dusk.";
+  if (kind === "school") return "Cancel ground-floor use; move registers upstairs.";
+  if (kind === "substation") return "Sandbag the yard; protect hospital feeder.";
+  return "Close if overtopped; mark a detour on the desk.";
+}
+
+function toVulnerable(s: CriticalSite): PrepVulnerable {
+  return { kind: s.kind, name: s.name, wardId: s.wardId, why: s.note, action: siteAction(s.kind) };
+}
+
+export function fallbackVulnerable(input: { incidents?: Incident[]; hazards?: Hazard[] }): VulnerableMap {
+  const incidents = input.incidents ?? [];
+  const hazards = input.hazards ?? [];
+  const ranked = [...WARDS]
+    .map((w) => ({ w, score: scoreWard(w.id, hazards, incidents) }))
+    .sort((a, b) => b.score - a.score);
+  const hot = new Set(ranked.slice(0, 4).map((r) => r.w.id));
+  hot.add("W17");
+  const sites = CRITICAL_SITES.filter((s) => hot.has(s.wardId) || s.wardId === "SUB").map(toVulnerable);
+  for (const kind of PREP_KINDS) {
+    if (sites.some((s) => s.kind === kind)) continue;
+    const extra = CRITICAL_SITES.find((s) => s.kind === kind);
+    if (extra) sites.push(toVulnerable(extra));
+  }
+  return {
+    headline: `If the flood comes, ${sites.length} sites take the first hit — schools, hospitals, elderly homes, roads, substations, and shelters.`,
+    windowHours: 48,
+    sites,
+    fallback: true,
+  };
+}
+
+export function coerceVulnerable(raw: Record<string, unknown>, fallback: VulnerableMap): VulnerableMap {
+  const kinds = new Set<PrepAssetKind>(PREP_KINDS);
+  const rawSites = Array.isArray(raw.sites) ? raw.sites : Array.isArray(raw.vulnerable) ? raw.vulnerable : null;
+  const parsed = rawSites
+    ? rawSites.slice(0, 24).map((row) => {
+        const r = (row ?? {}) as Record<string, unknown>;
+        const kind = kinds.has(r.kind as PrepAssetKind) ? (r.kind as PrepAssetKind) : "shelter";
+        return {
+          kind,
+          name: String(r.name ?? "").trim(),
+          wardId: String(r.wardId ?? "").trim(),
+          why: String(r.why ?? "").trim(),
+          action: String(r.action ?? "").trim() || siteAction(kind),
+        };
+      })
+    : fallback.sites;
+  const sites = parsed.filter((v) => v.name);
+  const have = new Set(sites.map((s) => s.kind));
+  for (const row of fallback.sites) {
+    if (!have.has(row.kind)) {
+      sites.push(row);
+      have.add(row.kind);
+    }
+  }
+  const headline = String(raw.headline ?? fallback.headline).trim() || fallback.headline;
+  const windowHours = typeof raw.windowHours === "number" ? Math.min(48, Math.max(24, raw.windowHours)) : 48;
+  return {
+    headline,
+    windowHours,
+    sites: sites.length ? sites : fallback.sites,
     fallback: false,
   };
 }

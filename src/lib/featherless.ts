@@ -1,4 +1,7 @@
-import { coerceBrief, fallbackBrief, sectorContextText } from "@/lib/delta";
+import { coerceSitrep, fallbackSitrep } from "@/lib/agents/summary";
+import type { VerifyClerkAsk } from "@/lib/agents/verification";
+import { parseVerifyTag } from "@/lib/agents/verification";
+import { coerceBrief, coercePreposition, fallbackBrief, fallbackPreposition, sectorContextText } from "@/lib/delta";
 import type {
   BeforeBrief,
   DispatchCandidate,
@@ -7,10 +10,13 @@ import type {
   IncidentNear,
   IncidentReason,
   InfraAsset,
+  PrepositionPlan,
   ResourceAsset,
+  Sitrep,
   Severity,
   SupportApplication,
   SupportKind,
+  VerificationTag,
 } from "@/lib/types";
 
 export type ReportStudy = IncidentReason & {
@@ -166,7 +172,7 @@ export async function studyReport(input: {
     `Decide this field report. You override heuristics if they are wrong. Return JSON:
 {"severity":"critical"|"high"|"normal","priorityScore":0-250,"resource":"short noun","quantity":number,"title":"short desk title","verification":"verified"|"uncertain"|"conflicting","summary":"2-3 sentences: what is happening, why it matters, what you decided","risks":["..."],"actions":["first move","second"],"peopleEstimate":number,"confidence":0-1,"decision":"one sentence of the ruling","routeEmails":["email of first desk to notify"]}
 
-Rules: critical = life at risk (trapped, rooftop, evac, drowning, ambulance). high = medical or large urgent need. normal = blankets, food, water without immediate danger. Do not mark everything high. Pick routeEmails from the candidate desks only, nearest capable first. If none, empty array.
+Rules: life-safety first. 20 medical evacuations beat 500 food kits. Hospital/ICU power beats shelter water. Shelter water beats bulk food. Volume never promotes logistics over evac. critical = life at risk (trapped, rooftop, evac, drowning, ambulance). high = medical or hospital power. normal = blankets, food, water without immediate danger. You may override the heuristic score if it is wrong. Pick routeEmails from the candidate desks only, nearest capable first. If none, empty array.
 
 Location: ${input.location}
 Need: ${input.need}
@@ -315,22 +321,23 @@ export async function assignRescueTeams(input: {
   const blocks = input.incidents
     .map((inc) => {
       const cands = (input.candidatesByIncident[inc.id] ?? [])
-        .filter((c) => c.available)
-        .slice(0, 8)
+        .slice()
+        .sort((a, b) => Number(b.available) - Number(a.available) || b.fit - a.fit || a.etaMin - b.etaMin)
+        .slice(0, 10)
         .map(
           (c) =>
-            `${c.resourceId}|${c.callsign}|skills:${c.skills.join(",")}|gear:${c.equipment.join(",")}|eta:${c.etaMin}|fit:${c.fit}|danger:${c.danger}|status:${c.status}|blockedPath:${c.blockedOnPath.join(",") || "none"}`,
+            `${c.resourceId}|${c.callsign}|loc:${c.locationId}|skills:${c.skills.join(",")}|gear:${c.equipment.join(",")}|eta:${c.etaMin}|fit:${c.fit}|danger:${c.danger}|available:${c.available}|status:${c.status}|blockedPath:${c.blockedOnPath.join(",") || "none"}`,
         )
         .join("\n");
-      return `INC ${inc.id} | ${inc.title} | need:${inc.resource} | ${inc.severity} | ${inc.locationLabel}\n${cands || "(no free units)"}`;
+      return `INC ${inc.id} | ${inc.title} | need:${inc.resource} | ${inc.severity} | ${inc.locationLabel}\n${cands || "(no units)"}`;
     })
     .join("\n\n");
   const hit = await brainRaw(
-    `Assign rescue units. Do NOT pick nearest-only. Weight skills, equipment, availability, danger on path, and travel time. Prefer a capable unit 10–20 min farther over a nearer mismatch. Reason must look like: "Team 4 is best because flood-rescue equipment, 12 min."
+    `Assign rescue units. Do NOT pick nearest-only. Weight skills, equipment, availability, location, danger on path, and travel time (ETA). Prefer a capable unit 10–20 min farther over a nearer mismatch. Never assign a busy unit. Reason must look like: "Team 4 is best because flood-rescue equipment, 12 min."
 Return JSON:
 {"picks":[{"incidentId":"...","resourceId":"T4","reason":"Team 4 is best because flood-rescue equipment, 12 min.","etaMin":12}]}
 
-Skip an incident if no capable free unit. resourceId must be from that incident's list.
+Skip an incident if no capable free unit. resourceId must be the id from that incident's list (e.g. T4), not the callsign.
 
 ${blocks}`,
     24000,
@@ -509,6 +516,209 @@ Rules: reason from rainfall, terrain, flood history, and population. Name Krishn
   if (!brief.risks.length) brief.risks = fallback.risks;
   if (!brief.headline) return null;
   return brief;
+}
+
+export async function planPreposition(input: {
+  resources: ResourceAsset[];
+  incidents?: Incident[];
+  hazards?: Hazard[];
+  timeoutMs?: number;
+}): Promise<PrepositionPlan | null> {
+  const fallback = fallbackPreposition(input);
+  const free = input.resources.filter((r) => r.status === "free");
+  const units = free
+    .map(
+      (r) =>
+        `${r.id} ${r.callsign} ${r.kind} @${r.locationId} skills=${r.skills.join("/")} gear=${r.equipment.join("/")}`,
+    )
+    .join("\n");
+  const open = (input.incidents ?? [])
+    .filter((i) => i.status !== "resolved")
+    .map((i) => `${i.id} ${i.severity} @${i.locationId} ${i.title}`)
+    .join("\n");
+  const blocked = (input.hazards ?? [])
+    .filter((h) => h.status === "blocked")
+    .map((h) => `${h.roadId} ${h.label}`)
+    .join("; ");
+  const hit = await brainRaw(
+    `${sectorContextText()}
+
+FREE UNITS (use these ids only):
+${units || "(none)"}
+
+OPEN TICKETS:
+${open || "(quiet)"}
+
+BLOCKED ROADS: ${blocked || "none"}
+
+Optimize resource pre-positioning BEFORE the cyclone. Move only boats, medical teams, and water tankers to named locations. Do not invent ids. Prefer boats to W17/W3/W4/SH-C, medical to W17 and HOSP, tankers to SH-C/SH-B and the canal belt. One unit per move. Skip units already at the target.
+Return JSON only:
+{"headline":"one sentence on the staging order","orders":"Before the cyclone arrives, move N rescue boats, N medical teams and N water tankers to these named places.","boats":0,"medical":0,"tankers":0,"sites":[{"id":"W17","label":"Ward 17 Tenali canal belt","why":"why this site"}],"moves":[{"resourceId":"BOAT-5","callsign":"Boat 5","fromId":"W5","toId":"W17","toLabel":"Ward 17 Tenali canal belt","why":"why this unit here"}]}`,
+    input.timeoutMs ?? 32000,
+    1800,
+  );
+  if (!hit) return null;
+  const plan = coercePreposition(hit.json, fallback, input.resources);
+  plan.model = hit.model;
+  if (!plan.moves.length) plan.moves = fallback.moves;
+  if (!plan.headline) return null;
+  return plan;
+}
+
+export async function composeSitrep(input: {
+  incidents: Incident[];
+  resources: ResourceAsset[];
+  hazards: Hazard[];
+  tick?: number;
+  timeoutMs?: number;
+}): Promise<Sitrep | null> {
+  const base = fallbackSitrep({
+    incidents: input.incidents,
+    resources: input.resources,
+    hazards: input.hazards,
+    tick: input.tick,
+  });
+  const open = input.incidents
+    .filter((i) => i.status !== "resolved")
+    .map((i) => `${i.id} ${i.severity} @${i.locationLabel} need:${i.resource} ${i.title}`)
+    .join("\n");
+  const blocked = input.hazards
+    .filter((h) => h.status === "blocked")
+    .map((h) => `${h.roadId} ${h.label}`)
+    .join("; ");
+  const units = `${base.freeUnits} free / ${base.assignedUnits} committed of ${input.resources.length}`;
+  const hit = await brainRaw(
+    `${sectorContextText()}
+
+OPEN TICKETS:
+${open || "(quiet)"}
+
+BLOCKED ROADS: ${blocked || "none"}
+UNITS: ${units}
+
+Board counts (keep these numbers unless you have a clear reason to round):
+active=${base.activeIncidents} critical=${base.critical} high=${base.high} roadsBlocked=${base.roadsBlocked} sheltersNearCapacity=${base.sheltersNearCapacity}
+
+Write a duty sitrep. Return JSON only:
+{"headline":"one sentence for the duty rail: active, critical, blocked roads, shelter pressure","activeIncidents":number,"critical":number,"high":number,"roadsBlocked":number,"freeUnits":number,"assignedUnits":number,"sheltersNearCapacity":number,"predictedShortage":"one sentence naming the next shortage (water at a named shelter, medical, boats) or empty string","predictions":["short knock-on line"]}
+
+Rules: name Krishna-delta places. If a shelter (SH-B / SH-C / Kanaka / Tenali camp) is taking water or food tickets, mark it near capacity. Predicted shortage must be operational, not weather poetry.`,
+    input.timeoutMs ?? 18000,
+    900,
+  );
+  if (!hit) return null;
+  const sitrep = coerceSitrep(hit.json, base);
+  sitrep.model = hit.model;
+  if (!sitrep.headline) return null;
+  return sitrep;
+}
+
+function fmtPeer(p: VerifyClerkAsk["incoming"]): string {
+  const when = new Date(p.timestamp).toISOString();
+  const status = p.hazardStatus && p.hazardStatus !== "unknown" ? p.hazardStatus : "n/a";
+  return `${when} | ${p.id} | ${p.source} | status:${status} | ${p.text}`;
+}
+
+export async function verifyCorpus(
+  ask: VerifyClerkAsk,
+): Promise<{ verification: VerificationTag; reason: string; model?: string } | null> {
+  const hit = await brainRaw(
+    `Compare this incoming report against the corpus on the same subject. Use timestamps. Classic conflict: one source says a bridge/road is blocked, another says it is open.
+Return JSON:
+{"verification":"verified"|"uncertain"|"conflicting","reason":"one sentence"}
+
+Rules:
+- conflicting: contemporaneous reports disagree (blocked vs open / collapsed vs restored) with no clear later correction.
+- verified: independent sources agree, or a clearly later update supersedes older ones (e.g. control room opens a road after an earlier block).
+- uncertain: a single weak source, or the corpus is too thin to corroborate.
+Do not change priority scores. Judge only verification.
+
+Subject: ${ask.subjectKey}
+Heuristic tag: ${ask.heuristic} (${ask.corroboration} sources)
+
+Incoming (latest to judge):
+${fmtPeer(ask.incoming)}
+
+Corpus on this subject (older/other):
+${ask.peers.length ? ask.peers.map(fmtPeer).join("\n") : "(none)"}`,
+    16000,
+    600,
+  );
+  if (!hit) return null;
+  const verification = parseVerifyTag(hit.json.verification);
+  if (!verification) return null;
+  return {
+    verification,
+    reason: String(hit.json.reason ?? "").trim() || `${verification} vs corpus`,
+    model: hit.model,
+  };
+}
+
+export type PriorityOverrideRow = {
+  id: string;
+  priorityScore: number;
+  severity?: Severity;
+  why: string;
+};
+
+export async function rankEmergencies(input: {
+  incidents: {
+    id: string;
+    title: string;
+    resource: string;
+    quantity: number;
+    locationLabel: string;
+    heuristicScore: number;
+    heuristicSeverity: Severity;
+    verification: string;
+    why?: string;
+  }[];
+}): Promise<{ rows: PriorityOverrideRow[]; model: string } | null> {
+  const rows = input.incidents.slice(0, 24);
+  if (!rows.length) return null;
+  const hit = await brainRaw(
+    `Rank these open needs for a flood desk with scarce teams. Life-safety first. Return JSON:
+{"ranks":[{"id":"INC-...","priorityScore":0-250,"severity":"critical"|"high"|"normal","why":"one sentence"}]}
+
+Policy (do not violate unless evidence clearly says the heuristic missed a life threat):
+- 20 people needing medical evacuation outrank 500 people needing food.
+- A hospital that needs power outranks a shelter that needs water.
+- Shelter water outranks bulk food.
+- Quantity must not let logistics beat evac/medevac.
+- You MAY override heuristic scores when wording or verification shows the heuristic is wrong.
+
+Use only these ids. Higher score = go first.
+
+${rows
+  .map(
+    (i) =>
+      `${i.id} | ${i.title} | need:${i.resource} x${i.quantity} | ${i.locationLabel} | heuristic ${i.heuristicSeverity} ${i.heuristicScore} | ${i.verification} | ${i.why || ""}`,
+  )
+  .join("\n")}`,
+    22000,
+    1600,
+  );
+  if (!hit) return null;
+  const raw = hit.json.ranks ?? hit.json.overrides ?? hit.json.incidents;
+  if (!Array.isArray(raw)) return null;
+  const out: PriorityOverrideRow[] = raw
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const id = String(r.id ?? "");
+      if (!id) return null;
+      const sev = r.severity;
+      const item: PriorityOverrideRow = {
+        id,
+        priorityScore: typeof r.priorityScore === "number" ? r.priorityScore : 0,
+        why: String(r.why ?? "").trim(),
+      };
+      if (sev === "critical" || sev === "high" || sev === "normal") item.severity = sev;
+      return item;
+    })
+    .filter((x): x is PriorityOverrideRow => Boolean(x));
+  if (!out.length) return null;
+  return { rows: out, model: hit.model };
 }
 
 export function reasonFromStudy(study: ReportStudy): IncidentReason {

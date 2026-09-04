@@ -6,7 +6,7 @@ import type { Incident } from "@/lib/types";
 import { useOps } from "@/lib/useOps";
 
 export function CommandBoard() {
-  const { incidents, resources, assignments, events } = useOps();
+  const { incidents, resources, assignments, events, sitrep } = useOps();
   const open = incidents.filter((i) => i.status !== "resolved");
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,6 +56,7 @@ export function CommandBoard() {
         reason: data.reason,
         severity: data.severity ?? row.severity,
         priorityScore: data.priorityScore ?? row.priorityScore,
+        priorityWhy: whyFromStudy(data.reason.decision, data.reason.summary) || row.priorityWhy,
         updatedAt: Date.now(),
       });
     } finally {
@@ -69,8 +70,14 @@ export function CommandBoard() {
         <header className="sticky top-0 z-10 bg-white px-5 py-4 border-b border-[var(--ink)]">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Krishna delta · ranked</p>
+              <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Krishna delta · sitrep</p>
               <h1 className="mt-1 text-[26px] font-semibold leading-none">Needs board</h1>
+              {sitrep?.headline ? (
+                <p className="mt-2 max-w-[36rem] text-[13px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>
+              ) : null}
+              {sitrep?.predictedShortage ? (
+                <p className="mt-1 max-w-[36rem] text-[13px] leading-snug">{sitrep.predictedShortage}</p>
+              ) : null}
             </div>
             <div className="flex gap-5 text-[13px]">
               <Metric n={critical} label="life" alert={critical > 0} />
@@ -83,6 +90,7 @@ export function CommandBoard() {
         <ul>
           {incidents.map((i) => {
             const on = current?.id === i.id;
+            const why = whyLine(i);
             return (
               <li key={i.id}>
                 <button
@@ -92,10 +100,14 @@ export function CommandBoard() {
                     on ? "bg-[var(--paper)]" : "bg-white hover:bg-[var(--paper-2)]"
                   }`}
                 >
-                  <span className="w-8 pt-0.5 tabular-nums text-[var(--mute)]">{String(i.rank).padStart(2, "0")}</span>
+                  <span className="w-10 shrink-0 text-center">
+                    <span className="block tabular-nums font-semibold leading-none">{String(i.rank).padStart(2, "0")}</span>
+                    <span className="mt-1 block text-[10px] uppercase tracking-wide text-[var(--mute)]">AI</span>
+                  </span>
                   <span className={`mt-1 h-3 w-3 shrink-0 ${sevDot(i.severity)}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium leading-snug">{i.title}</div>
+                    <p className="mt-1 text-[14px] leading-snug">{why}</p>
                     <div className="mt-1 text-[13px] text-[var(--mute)] flex flex-wrap items-center gap-2">
                       <span>{i.locationLabel}</span>
                       <span
@@ -117,7 +129,7 @@ export function CommandBoard() {
                     <div className={`text-[13px] font-semibold uppercase tracking-wide ${sevColor(i.severity)}`}>
                       {i.severity}
                     </div>
-                    <div className="tabular-nums text-[13px] text-[var(--mute)]">{i.priorityScore}</div>
+                    <div className="tabular-nums text-[13px] text-[var(--mute)]">score {i.priorityScore}</div>
                   </div>
                 </button>
               </li>
@@ -143,16 +155,20 @@ export function CommandBoard() {
               </div>
               <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
                 <div>
+                  <dt className="text-[var(--mute)]">AI rank</dt>
+                  <dd className="tabular-nums">{String(current.rank).padStart(2, "0")}</dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--mute)]">Score</dt>
+                  <dd className="tabular-nums">{current.priorityScore}</dd>
+                </div>
+                <div>
                   <dt className="text-[var(--mute)]">Place</dt>
                   <dd>{current.locationLabel}</dd>
                 </div>
                 <div>
                   <dt className="text-[var(--mute)]">Status</dt>
                   <dd className="capitalize">{current.status}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--mute)]">Score</dt>
-                  <dd className="tabular-nums">{current.priorityScore}</dd>
                 </div>
                 <div>
                   <dt className="text-[var(--mute)]">Check</dt>
@@ -169,6 +185,10 @@ export function CommandBoard() {
                       {current.verification}
                     </span>
                   </dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-[var(--mute)]">Why</dt>
+                  <dd>{whyLine(current)}</dd>
                 </div>
               </dl>
               {event && (
@@ -256,6 +276,33 @@ export function CommandBoard() {
       </aside>
     </div>
   );
+}
+
+function whyFromStudy(decision?: string, summary?: string): string {
+  const decisionLine = oneLine(decision);
+  if (decisionLine) return decisionLine;
+  return oneLine(summary);
+}
+
+function whyLine(i: Incident): string {
+  const stored = oneLine(i.priorityWhy);
+  if (stored) return stored;
+  const studied = whyFromStudy(i.reason?.decision, i.reason?.summary);
+  if (studied) return studied;
+  const check =
+    i.verification === "verified"
+      ? "source holds"
+      : i.verification === "uncertain"
+        ? "source still uncertain"
+        : "sources conflict";
+  return `${i.severity} · score ${i.priorityScore} · ${i.resource} · ${check}`;
+}
+
+function oneLine(s?: string): string {
+  const t = (s ?? "").trim();
+  if (!t) return "";
+  const first = t.split(/(?<=[.!?])\s/)[0] ?? t;
+  return first.length > 140 ? `${first.slice(0, 137).trimEnd()}…` : first;
 }
 
 function Metric({ n, label, alert }: { n: number; label: string; alert?: boolean }) {

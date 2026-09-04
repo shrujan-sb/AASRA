@@ -11,10 +11,14 @@ import { useOps } from "@/lib/useOps";
 const NAV = [
   { href: "/console", label: "Needs", hint: "Ranked tickets" },
   { href: "/console/predict", label: "Predict", hint: "Before landfall" },
+  { href: "/console/preposition", label: "Stage", hint: "Boats / med / water" },
+  { href: "/console/risk", label: "Risk", hint: "24–48h flood" },
+  { href: "/console/vulnerable", label: "Vulnerable", hint: "If flood comes" },
   { href: "/console/feed", label: "Wire", hint: "Raw intake" },
   { href: "/console/map", label: "Map", hint: "Ground picture" },
   { href: "/console/allocate", label: "Teams", hint: "Who is out" },
-  { href: "/console/cascade", label: "Knock-on", hint: "Repair order" },
+  { href: "/console/cascade", label: "Knock-on", hint: "Grid cascade" },
+  { href: "/console/repair", label: "Repair", hint: "Roads & bridges" },
   { href: "/console/approvals", label: "Approvals", hint: "Gov & NGO" },
   { href: "/console/admins", label: "Keys", hint: "Who can sign in" },
 ];
@@ -60,8 +64,21 @@ export function Shell({ children }: { children: ReactNode }) {
             <span className="text-[var(--mute)]">Life-safety</span>
             <span className={`tabular-nums font-semibold ${life ? "text-[var(--crit)]" : ""}`}>{life}</span>
           </div>
+          <div className="mt-1 flex justify-between">
+            <span className="text-[var(--mute)]">Roads blocked</span>
+            <span className={`tabular-nums font-semibold ${sitrep?.roadsBlocked ? "text-[var(--crit)]" : ""}`}>
+              {sitrep?.roadsBlocked ?? 0}
+            </span>
+          </div>
+          <div className="mt-1 flex justify-between">
+            <span className="text-[var(--mute)]">Shelters tight</span>
+            <span className="tabular-nums font-semibold">{sitrep?.sheltersNearCapacity ?? 0}</span>
+          </div>
           {sitrep?.headline && (
             <p className="mt-2 text-[12px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>
+          )}
+          {sitrep?.predictedShortage && (
+            <p className="mt-1 text-[12px] leading-snug">{sitrep.predictedShortage}</p>
           )}
         </div>
 

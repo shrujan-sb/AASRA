@@ -1,12 +1,12 @@
 "use client";
 
 import { IntakeAgent } from "@/lib/agents/intake";
-import { VerificationAgent } from "@/lib/agents/verification";
+import { stampIds, VerificationAgent } from "@/lib/agents/verification";
 import { PrioritizationAgent } from "@/lib/agents/prioritization";
 import { RoutingAgent } from "@/lib/agents/routing";
 import { SummaryAgent } from "@/lib/agents/summary";
 import { getAll, hydrateLocal, nid, upsert, clearAll } from "@/lib/db";
-import { requestAssign, requestReroute, requestRepairs } from "@/lib/opsRemote";
+import { requestAssign, requestPrioritize, requestRepairs, requestReroute, requestSitrep, requestVerify } from "@/lib/opsRemote";
 import { SEED_INFRA, SEED_RESOURCES } from "@/lib/seed";
 import { DRIP_POOL, FEED_SCRIPT, toInbox } from "@/lib/sim/messages";
 import type {
@@ -31,19 +31,55 @@ async function log(agent: AgentLog["agent"], message: string, refId?: string) {
 
 export async function ingestMessage(msg: InboxMessage) {
   await upsert("inbox", msg.id, msg);
-  const parsed = IntakeAgent.run(msg);
+  const parsed = await IntakeAgent.runAsync(msg);
   await log("intake", `Structured ${parsed.type} @ ${parsed.locationId} · ${parsed.resource}`, parsed.id);
 
   const corpus = getAll<StructuredEvent>("events");
-  const v = VerificationAgent.run({ incoming: parsed, corpus });
+  const { heuristic, clerk } = VerificationAgent.ask({ incoming: parsed, corpus });
   const event: StructuredEvent = {
     ...parsed,
-    verification: v.verification,
-    corroboration: v.corroboration,
+    verification: heuristic.verification,
+    corroboration: heuristic.corroboration,
     stage: "verified",
   };
   await upsert("events", event.id, event);
-  await log("verification", `${v.verification} (${v.corroboration} sources) ${event.subjectKey}`, event.id);
+  if (heuristic.verification === "conflicting") {
+    for (const id of stampIds(event.id, clerk.peers, "conflicting", parsed.hazardStatus)) {
+      if (id === event.id) continue;
+      const row = getAll<StructuredEvent>("events").find((e) => e.id === id);
+      if (row) await upsert("events", id, { ...row, verification: "conflicting" });
+    }
+  }
+  await log(
+    "verification",
+    `${heuristic.verification} (${heuristic.corroboration} sources) ${event.subjectKey}`,
+    event.id,
+  );
+  void requestVerify(clerk).then(async (hit) => {
+    if (!hit.ok || (hit.verification === heuristic.verification && !hit.studied)) return;
+    const tag = hit.verification;
+    VerificationAgent.accept(event.id, tag, heuristic.corroboration, hit.reason);
+    for (const id of hit.ids) {
+      const row = getAll<StructuredEvent>("events").find((e) => e.id === id);
+      if (!row) continue;
+      await upsert("events", id, { ...row, verification: tag });
+    }
+    for (const inc of getAll<Incident>("incidents")) {
+      if (hit.ids.includes(inc.eventId) || inc.id === `INC-${event.subjectKey}`) {
+        await upsert("incidents", inc.id, { ...inc, verification: tag, updatedAt: Date.now() });
+      }
+    }
+    for (const hz of getAll<Hazard>("hazards")) {
+      if (hz.sourceEventId && hit.ids.includes(hz.sourceEventId)) {
+        await upsert("hazards", hz.id, { ...hz, verification: tag, updatedAt: Date.now() });
+      }
+    }
+    await log(
+      "verification",
+      `${hit.studied ? "clerk" : "desk"} ${tag} · ${hit.reason || event.subjectKey}`,
+      event.id,
+    );
+  });
 
   if (event.type === "hazard_report" && event.hazardStatus && event.hazardStatus !== "unknown") {
     const roadId = event.subjectKey.startsWith("road:") ? event.subjectKey.slice(5) : event.locationId;
@@ -94,6 +130,7 @@ export async function ingestMessage(msg: InboxMessage) {
   });
   await upsert("sitrep", "current", sitrep);
   await log("summary", sitrep.headline);
+  scheduleSitrep();
 
   if (event.type === "hazard_report") {
     void requestReroute(event.locationLabel).then(() => void requestRepairs());
@@ -120,6 +157,8 @@ export async function ensureSeeded() {
     roadsBlocked: 0,
     freeUnits: SEED_RESOURCES.length,
     assignedUnits: 0,
+    sheltersNearCapacity: 0,
+    predictedShortage: "",
     headline: "Sector quiet — feed not started",
     predictions: [],
     tick: 0,
@@ -166,6 +205,8 @@ export function resetSession() {
   started = false;
   tick = 0;
   if (typeof window !== "undefined") {
+    window.clearTimeout(assignTimer);
+    window.clearTimeout(sitrepTimer);
     clearAll();
     window.location.reload();
   }
@@ -176,6 +217,15 @@ function scheduleClerkAssign() {
   if (typeof window === "undefined") return;
   window.clearTimeout(assignTimer);
   assignTimer = window.setTimeout(() => {
-    void requestAssign();
+    void requestPrioritize().then(() => void requestAssign());
   }, 1400);
+}
+
+let sitrepTimer: number | undefined;
+function scheduleSitrep() {
+  if (typeof window === "undefined") return;
+  window.clearTimeout(sitrepTimer);
+  sitrepTimer = window.setTimeout(() => {
+    void requestSitrep(tick);
+  }, 2800);
 }

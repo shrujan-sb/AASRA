@@ -60,6 +60,9 @@ export type Incident = {
   severity: Severity;
   priorityScore: number;
   rank: number;
+  priorityWhy?: string;
+  heuristicScore?: number;
+  scoreSource?: "heuristic" | "ai";
   verification: VerificationTag;
   status: "open" | "assigned" | "rerouted" | "resolved";
   createdAt: number;
@@ -173,6 +176,14 @@ export type PrepVulnerable = {
   action: string;
 };
 
+export type VulnerableMap = {
+  headline: string;
+  windowHours: number;
+  sites: PrepVulnerable[];
+  model?: string;
+  fallback?: boolean;
+};
+
 export type PrepMove = {
   resourceId: string;
   callsign: string;
@@ -193,6 +204,24 @@ export type BeforeBrief = {
   fallback?: boolean;
 };
 
+export type PrepSite = {
+  id: string;
+  label: string;
+  why: string;
+};
+
+export type PrepositionPlan = {
+  headline: string;
+  orders: string;
+  boats: number;
+  medical: number;
+  tankers: number;
+  sites: PrepSite[];
+  moves: PrepMove[];
+  model?: string;
+  fallback?: boolean;
+};
+
 export type Sitrep = {
   id: "current";
   generatedAt: number;
@@ -202,9 +231,13 @@ export type Sitrep = {
   roadsBlocked: number;
   freeUnits: number;
   assignedUnits: number;
+  sheltersNearCapacity: number;
+  predictedShortage: string;
   headline: string;
   predictions: string[];
   tick: number;
+  model?: string;
+  fallback?: boolean;
 };
 
 export type AgentLog = {

@@ -24,12 +24,11 @@ export function CascadeBoard() {
   const { events, hazards, infra } = useOps();
   const hot = events.some((e) => /substation|33kv/i.test(e.rawText));
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
-    if (!infra.length || infra.every((r) => !r.reason)) {
-      void requestRepairs();
-    }
-  }, [infra, hazards]);
+    void requestRepairs();
+  }, []);
 
   return (
     <div className="h-full min-h-0 grid lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)]">
@@ -66,12 +65,18 @@ export function CascadeBoard() {
             className="h-8 px-3 text-[13px] border border-[var(--ink)] bg-white disabled:opacity-50"
             onClick={() => {
               setBusy(true);
-              void requestRepairs().finally(() => setBusy(false));
+              setErr("");
+              void requestRepairs()
+                .then((data) => {
+                  if (!data.ok) setErr("Repair desk failed.");
+                })
+                .finally(() => setBusy(false));
             }}
           >
             {busy ? "Ranking…" : "Rank again"}
           </button>
         </header>
+        {err ? <p className="px-5 py-2 text-[13px] text-[var(--crit)]">{err}</p> : null}
         <ol>
           {infra.map((row) => (
             <li key={row.id} className="px-5 py-4 border-b border-[var(--rule)]">

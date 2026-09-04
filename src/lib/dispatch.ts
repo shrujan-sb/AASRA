@@ -5,7 +5,6 @@ import type {
   DispatchCandidate,
   Hazard,
   Incident,
-  IncidentPick,
   InfraAsset,
   ResourceAsset,
 } from "@/lib/types";
@@ -42,7 +41,11 @@ export function dangerScore(incident: Incident, blockedOnPath: string[]): number
 }
 
 export function becauseLine(c: DispatchCandidate): string {
-  const gear = c.equipment[0] || c.skills[0] || c.kind;
+  const gear =
+    c.equipment.find((e) => /flood-rescue|boat|ambulance|tanker|generator|clinic/i.test(e)) ||
+    c.equipment[0] ||
+    c.skills[0] ||
+    c.kind;
   return `${c.callsign} is best because ${gear}, ${c.etaMin} min.`;
 }
 
@@ -241,14 +244,4 @@ export function heuristicInfraRank(rows: InfraAsset[], hazards: Hazard[]): Infra
     row.rank = i + 1;
   });
   return scored;
-}
-
-export function toIncidentPick(unit: ResourceAsset, pick: DispatchPick): IncidentPick {
-  return {
-    resourceId: unit.id,
-    callsign: unit.callsign,
-    reason: pick.reason,
-    etaMin: pick.etaMin,
-    model: pick.model,
-  };
 }

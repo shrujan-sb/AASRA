@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Location and need are required." }, { status: 400 });
   }
 
-  const ticket = buildPublicReport({
+  const ticket = await buildPublicReport({
     location,
     need,
     name: body.name,
