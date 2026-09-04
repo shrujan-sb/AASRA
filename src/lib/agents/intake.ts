@@ -21,6 +21,17 @@ function detectLang(text: string): Lang {
 }
 
 function locationOf(text: string): { id: string; label: string } {
+  const helpAt = text.match(/need help(?: in| at)?\s+([^:]+):/i);
+  if (helpAt) {
+    const label = helpAt[1]!.trim().replace(/\s*\[[-\d.]+,\s*[-\d.]+\]\s*$/, "");
+    const ward = label.match(/ward\s*(\d+)/i);
+    if (ward) {
+      const hit = WARDS.find((w) => w.id === `W${ward[1]}` || w.name.toLowerCase().includes(`ward ${ward[1]}`));
+      if (hit) return { id: hit.id, label: hit.name };
+    }
+    const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24);
+    return { id: `LOC-${slug || "field"}`, label };
+  }
   const ward = text.match(/ward\s*(\d+)/i);
   if (ward) {
     const hit = WARDS.find((w) => w.id === `W${ward[1]}` || w.name.toLowerCase().includes(`ward ${ward[1]}`));
@@ -59,10 +70,13 @@ function typeOf(text: string): StructuredEvent["type"] {
 }
 
 function urgency(text: string): number {
-  if (/critical|dying|drown|immediate|now|life/i.test(text)) return 9;
-  if (/urgent|asap|need 2 nurses|evac/i.test(text)) return 7;
-  if (/shortage|soon/i.test(text)) return 4;
-  return 2;
+  const t = text.toLowerCase();
+  if (/\b(drown|drowning|dying|trapped|rooftop|collapse|life[- ]?threatening)\b/.test(t)) return 10;
+  if (/\b(evac|rescue|ambulance|critical|asap)\b/.test(t) || /\bnow\b/.test(t)) return 8;
+  if (/\b(urgent|injured|fever|medical camp|nurse)\b/.test(t)) return 6;
+  if (/\b(shortage|tonight|soon)\b/.test(t)) return 4;
+  if (/\b(blanket|blankets|food|ration|water)\b/.test(t)) return 2;
+  return 3;
 }
 
 function hazardStatus(text: string): StructuredEvent["hazardStatus"] {

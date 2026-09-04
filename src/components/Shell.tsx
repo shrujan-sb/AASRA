@@ -3,22 +3,27 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { BootScreen } from "@/components/site/BootScreen";
 import { useAuth } from "@/lib/auth";
-import { firebaseEnabled } from "@/lib/firebase";
-import { ensureSeeded, injectRoadBlock, resetSession, startLiveFeed } from "@/lib/pipeline";
+import { ensureSeeded, resetSession, startLiveFeed } from "@/lib/pipeline";
+import { useOps } from "@/lib/useOps";
 
 const NAV = [
-  { href: "/console", label: "Command" },
-  { href: "/console/feed", label: "Intake" },
-  { href: "/console/map", label: "Map" },
-  { href: "/console/allocate", label: "Assign" },
-  { href: "/console/cascade", label: "Cascade" },
+  { href: "/console", label: "Needs", hint: "Ranked tickets" },
+  { href: "/console/feed", label: "Wire", hint: "Raw intake" },
+  { href: "/console/map", label: "Map", hint: "Ground picture" },
+  { href: "/console/allocate", label: "Teams", hint: "Who is out" },
+  { href: "/console/cascade", label: "Knock-on", hint: "Grid / pumps" },
+  { href: "/console/approvals", label: "Approvals", hint: "Gov & NGO" },
+  { href: "/console/admins", label: "Keys", hint: "Who can sign in" },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
   const { session, ready, logout } = useAuth();
   const router = useRouter();
   const path = usePathname();
+  const { incidents, sitrep } = useOps();
+  const life = incidents.filter((i) => i.severity === "critical").length;
 
   useEffect(() => {
     if (ready && !session) router.replace("/");
@@ -30,56 +35,92 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [session]);
 
   if (!ready || !session) {
-    return <div className="p-10 text-xl">Checking duty pass…</div>;
+    return <BootScreen label="Opening the console" />;
   }
 
   return (
-    <div className="min-h-full flex flex-col">
-      <header className="shrink-0 border-b-2 border-[var(--rule)] px-6 md:px-10 py-4 flex flex-wrap items-center gap-x-8 gap-y-3">
-        <Link href="/console" className="flex items-center gap-3">
+    <div className="ops-shell">
+      <aside className="ops-rail">
+        <Link href="/console" className="flex items-center gap-2 px-4 pt-5 pb-4 border-b border-[var(--ink)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/mark.png" alt="Aasra" className="h-14 w-14 object-contain mix-blend-multiply" />
-          <span className="text-2xl font-semibold tracking-tight">Aasra</span>
+          <img src="/brand/mark.png" alt="" className="h-10 w-10 object-contain" />
+          <div>
+            <div className="font-semibold leading-none">Aasra</div>
+            <div className="mt-1 text-[11px] tracking-[0.16em] uppercase text-[var(--mute)]">Duty desk</div>
+          </div>
         </Link>
-        <nav className="flex flex-wrap items-end gap-6 text-xl">
+
+        <div className="px-4 py-3 border-b border-[var(--rule)] text-[13px]">
+          <div className="flex justify-between">
+            <span className="text-[var(--mute)]">Open</span>
+            <span className="tabular-nums font-semibold">{incidents.length}</span>
+          </div>
+          <div className="mt-1 flex justify-between">
+            <span className="text-[var(--mute)]">Life-safety</span>
+            <span className={`tabular-nums font-semibold ${life ? "text-[var(--crit)]" : ""}`}>{life}</span>
+          </div>
+          {sitrep?.headline && (
+            <p className="mt-2 text-[12px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>
+          )}
+        </div>
+
+        <nav className="flex-1 overflow-auto py-2">
           {NAV.map((n) => {
             const on = path === n.href;
             return (
-              <Link key={n.href} href={n.href} className={on ? "mark text-4xl text-[var(--crit)] leading-none" : "text-[var(--mute)]"}>
-                {n.label}
+              <Link
+                key={n.href}
+                href={n.href}
+                className={`block px-4 py-2.5 border-l-4 ${
+                  on ? "border-[var(--crit)] bg-white font-semibold" : "border-transparent text-[var(--mute)]"
+                }`}
+              >
+                <div>{n.label}</div>
+                <div className="text-[11px] font-normal tracking-wide uppercase">{n.hint}</div>
               </Link>
             );
           })}
         </nav>
-        <div className="ml-auto flex flex-wrap items-center gap-5 text-base">
+
+        <div className="mt-auto border-t border-[var(--ink)] px-4 py-3 text-[13px]">
           <Clock />
-          <span className={firebaseEnabled() ? "text-[var(--ok)]" : "text-[var(--warn)]"}>
-            {firebaseEnabled() ? "Firestore" : "Local store"}
-          </span>
-          <span>{session.name}</span>
-          <button type="button" onClick={() => void injectRoadBlock("NH-16")} className="underline decoration-2 underline-offset-4">
-            Block NH-16
-          </button>
-          <button type="button" onClick={resetSession} className="underline decoration-2 underline-offset-4">
-            Reset
-          </button>
-          <button type="button" onClick={() => void logout()} className="underline decoration-2 underline-offset-4">
-            Sign out
-          </button>
+          <div className="mt-1 truncate">{session.email}</div>
+          <div className="mt-3 flex gap-3 text-[var(--mute)]">
+            <button type="button" onClick={resetSession}>
+              Reset seed
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void logout().then(() => router.replace("/"));
+              }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
-      </header>
-      <div className="flex-1 min-h-0">{children}</div>
+      </aside>
+      <div className="ops-main">{children}</div>
     </div>
   );
 }
 
 function Clock() {
-  const [clock, setClock] = useState("--:--:--");
+  const [clock, setClock] = useState("");
   useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString("en-IN", { hour12: false }));
+    const tick = () =>
+      setClock(
+        new Date().toLocaleString("en-IN", {
+          hour12: false,
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      );
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, []);
-  return <time className="tabular-nums font-medium">{clock}</time>;
+  return <time className="tabular-nums font-semibold">{clock} IST</time>;
 }

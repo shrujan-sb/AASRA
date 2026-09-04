@@ -5,6 +5,8 @@ export type Severity = "critical" | "high" | "normal";
 export type ResourceKind = "team" | "vehicle" | "medical" | "supply";
 export type ResourceStatus = "free" | "assigned" | "en_route" | "committed";
 export type Lang = "en" | "hi" | "te";
+export type SupportKind = "government" | "ngo";
+export type ApplicationStatus = "pending" | "allowed" | "rejected";
 
 export type StructuredEvent = {
   id: string;
@@ -54,6 +56,36 @@ export type Incident = {
   status: "open" | "assigned" | "rerouted" | "resolved";
   createdAt: number;
   updatedAt: number;
+  reason?: IncidentReason;
+  lat?: number;
+  lng?: number;
+  helper?: IncidentHelper;
+  nearest?: IncidentNear[];
+};
+
+export type IncidentReason = {
+  summary: string;
+  risks: string[];
+  actions: string[];
+  peopleEstimate?: number;
+  confidence?: number;
+  model?: string;
+};
+
+export type IncidentHelper = {
+  email: string;
+  name: string;
+  orgName: string;
+  kind: SupportKind;
+  at: number;
+};
+
+export type IncidentNear = {
+  email: string;
+  name: string;
+  orgName: string;
+  kind: SupportKind;
+  km: number;
 };
 
 export type ResourceAsset = {
@@ -110,4 +142,37 @@ export type AgentLog = {
   at: number;
   message: string;
   refId?: string;
+};
+
+export type SupportApplication = {
+  id: string;
+  kind: SupportKind;
+  name: string;
+  email: string;
+  department?: string;
+  designation?: string;
+  idNumber?: string;
+  orgName?: string;
+  registrationNo?: string;
+  volunteerRole?: string;
+  phone?: string;
+  note?: string;
+  photoDataUrl?: string;
+  areaLabel?: string;
+  lat?: number;
+  lng?: number;
+  status: ApplicationStatus;
+  createdAt: number;
+  decidedAt?: number;
+};
+
+export type ApprovedSupport = {
+  id: string;
+  email: string;
+  kind: SupportKind;
+  name?: string;
+  orgName?: string;
+  areaLabel?: string;
+  lat?: number;
+  lng?: number;
 };

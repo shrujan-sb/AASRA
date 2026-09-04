@@ -17,15 +17,15 @@ const wadingr = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Aasra ReliefMesh — Sector Control",
-  description: "Disaster-response resource coordination console",
+  title: "Aasra — Relief mesh for a flood sector",
+  description: "Public reports, verified field teams, and a ranked officer desk.",
   icons: { icon: "/brand/logo.png" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${poppins.variable} ${wadingr.variable} h-full`}>
-      <body className={`${poppins.className} min-h-full`}>
+      <body className={`${poppins.className} h-full`}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

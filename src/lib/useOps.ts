@@ -31,7 +31,10 @@ export function useOps() {
   return {
     inbox: [...inbox].sort((a, b) => b.timestamp - a.timestamp),
     events: [...events].sort((a, b) => b.timestamp - a.timestamp),
-    incidents: [...incidents].sort((a, b) => a.rank - b.rank || b.priorityScore - a.priorityScore),
+    incidents: [...incidents]
+      .filter((i) => i.status !== "resolved")
+      .sort((a, b) => b.priorityScore - a.priorityScore || b.createdAt - a.createdAt)
+      .map((i, idx) => ({ ...i, rank: idx + 1 })),
     resources,
     assignments: [...assignments].sort((a, b) => b.updatedAt - a.updatedAt),
     hazards,

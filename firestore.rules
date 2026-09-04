@@ -1,8 +1,37 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /inbox/{id} {
+      allow create: if true;
+      allow read, update: if isSignedIn();
+    }
+    match /events/{id} {
+      allow create: if true;
+      allow read, update: if isSignedIn();
+    }
+    match /incidents/{id} {
+      allow create: if true;
+      allow read, update: if isSignedIn();
+    }
+    match /agentLogs/{id} {
+      allow create: if true;
+      allow read, update: if isSignedIn();
+    }
+    match /applications/{id} {
+      allow create: if request.resource.data.status == "pending"
+        && request.resource.data.keys().hasAll(["id", "kind", "name", "email", "status", "createdAt"]);
+      allow read, update: if isSignedIn();
+    }
+    match /approvedSupport/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn();
     }
   }
 }

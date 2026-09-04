@@ -1,0 +1,7 @@
+tmp-aasra
+node_modules
+.git
+.next
+.env.local
+AGENTS.md
+CLAUDE.md

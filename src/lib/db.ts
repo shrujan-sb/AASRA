@@ -8,13 +8,46 @@ import {
   type DocumentData,
 } from "firebase/firestore";
 import { getDb, firebaseEnabled } from "@/lib/firebase";
+import type { AgentLog, ApprovedSupport, Incident, InboxMessage, StructuredEvent, SupportApplication } from "@/lib/types";
+import { rankNearestSupport } from "@/lib/nearest";
 
 type Row = Record<string, unknown> & { id: string };
 type Listener = () => void;
+export type PublicTicket = {
+  inbox: InboxMessage;
+  event: StructuredEvent;
+  incident: Incident;
+  log: AgentLog;
+};
 
 const memory: Record<string, Record<string, Row>> = {};
 const listeners = new Map<string, Set<Listener>>();
 const LS_KEY = "aasra-ops-v1";
+const BUS_NAME = "aasra-ticket";
+
+let channel: BroadcastChannel | null | undefined;
+
+function getBus(): BroadcastChannel | null {
+  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return null;
+  if (channel === undefined) {
+    try {
+      channel = new BroadcastChannel(BUS_NAME);
+      channel.addEventListener("message", (ev: MessageEvent<PublicTicket | SupportApplication>) => {
+        const data = ev.data;
+        if (data && "incident" in data && data.incident?.id) applyPublicTicket(data as PublicTicket, false);
+        if (data && "kind" in data && "email" in data && data.id) applyApplication(data as SupportApplication, false);
+      });
+      window.addEventListener("storage", (e) => {
+        if (e.key !== LS_KEY || !e.newValue) return;
+        hydrateLocal();
+        listeners.forEach((set) => set.forEach((fn) => fn()));
+      });
+    } catch {
+      channel = null;
+    }
+  }
+  return channel ?? null;
+}
 
 function bucket(col: string): Record<string, Row> {
   if (!memory[col]) memory[col] = {};
@@ -33,6 +66,14 @@ function persist() {
   } catch {
     /* quota */
   }
+}
+
+function pushFs(col: string, id: string, row: Row) {
+  const fs = getDb();
+  if (!fs) return;
+  void setDoc(doc(fs, col, id), row, { merge: true }).catch(() => {
+    /* rules / offline */
+  });
 }
 
 export function hydrateLocal(): void {
@@ -57,9 +98,56 @@ export async function upsert(col: string, id: string, data: Record<string, unkno
   const row = { ...bucket(col)[id], ...data, id } as Row;
   bucket(col)[id] = row;
   emit(col);
-  const fs = getDb();
-  if (fs) {
-    await setDoc(doc(fs, col, id), row, { merge: true });
+  pushFs(col, id, row);
+}
+
+export function applyApplication(row: SupportApplication, relay = true): void {
+  hydrateLocal();
+  const stored: SupportApplication =
+    (row.photoDataUrl?.length ?? 0) > 700000 ? { ...row, photoDataUrl: undefined } : row;
+  bucket("applications")[row.id] = stored as unknown as Row;
+  emit("applications");
+  pushFs("applications", row.id, stored as unknown as Row);
+  if (relay) {
+    try {
+      getBus()?.postMessage(row);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+export function applyPublicTicket(ticket: PublicTicket, relay = true): void {
+  hydrateLocal();
+  if (
+    typeof ticket.incident.lat === "number" &&
+    typeof ticket.incident.lng === "number" &&
+    !(ticket.incident.nearest && ticket.incident.nearest.length)
+  ) {
+    ticket.incident.nearest = rankNearestSupport(
+      getAll<ApprovedSupport>("approvedSupport"),
+      ticket.incident.lat,
+      ticket.incident.lng,
+    );
+  }
+  bucket("inbox")[ticket.inbox.id] = ticket.inbox as unknown as Row;
+  bucket("events")[ticket.event.id] = ticket.event as unknown as Row;
+  bucket("incidents")[ticket.incident.id] = ticket.incident as unknown as Row;
+  bucket("agentLogs")[ticket.log.id] = ticket.log as unknown as Row;
+  emit("inbox");
+  emit("events");
+  emit("incidents");
+  emit("agentLogs");
+  pushFs("inbox", ticket.inbox.id, ticket.inbox as unknown as Row);
+  pushFs("events", ticket.event.id, ticket.event as unknown as Row);
+  pushFs("incidents", ticket.incident.id, ticket.incident as unknown as Row);
+  pushFs("agentLogs", ticket.log.id, ticket.log as unknown as Row);
+  if (relay) {
+    try {
+      getBus()?.postMessage(ticket);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -82,14 +170,14 @@ export function listen<T extends { id: string }>(col: string, cb: (rows: T[]) =>
   let unsubFs: (() => void) | undefined;
   if (fs && firebaseEnabled()) {
     unsubFs = onSnapshot(collection(fs, col), (snap) => {
-      const next: Record<string, Row> = {};
       snap.forEach((d) => {
-        next[d.id] = { ...(d.data() as DocumentData), id: d.id } as Row;
+        bucket(col)[d.id] = { ...(d.data() as DocumentData), id: d.id } as Row;
       });
-      memory[col] = next;
       listeners.get(col)?.forEach((fn) => fn());
     });
   }
+
+  getBus();
 
   return () => {
     listeners.get(col)?.delete(run);

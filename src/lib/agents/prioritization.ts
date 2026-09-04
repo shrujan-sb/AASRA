@@ -1,4 +1,4 @@
-import { DEFAULT_POLICY, scoreNeed } from "@/lib/policy";
+import { DEFAULT_POLICY, scoreNeed, severityFromScore } from "@/lib/policy";
 import type { Incident, StructuredEvent } from "@/lib/types";
 
 export type RankedIncident = Incident;
@@ -16,7 +16,7 @@ export const PrioritizationAgent = {
 
     const scored: Incident[] = [...bySubject.values()].map((e) => {
       const prev = existing.find((i) => i.id === `INC-${e.subjectKey}`);
-      const penalty = e.verification === "conflicting" ? 25 : e.verification === "uncertain" ? 8 : 0;
+      const penalty = e.verification === "conflicting" ? 20 : e.verification === "uncertain" ? 6 : 0;
       const priorityScore = scoreNeed(DEFAULT_POLICY, {
         resource: e.resource,
         raw: e.translated,
@@ -24,8 +24,7 @@ export const PrioritizationAgent = {
         urgencySignal: e.urgencySignal,
         verificationPenalty: penalty,
       });
-      const severity: Incident["severity"] =
-        priorityScore >= 140 ? "critical" : priorityScore >= 95 ? "high" : "normal";
+      const severity = severityFromScore(priorityScore, e.urgencySignal, e.resource, e.translated);
       return {
         id: `INC-${e.subjectKey}`,
         eventId: e.id,
