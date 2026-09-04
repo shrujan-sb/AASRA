@@ -8,11 +8,11 @@ import { firebaseEnabled } from "@/lib/firebase";
 import { ensureSeeded, injectRoadBlock, resetSession, startLiveFeed } from "@/lib/pipeline";
 
 const NAV = [
-  { href: "/console", label: "COMMAND" },
-  { href: "/console/feed", label: "FEED" },
-  { href: "/console/map", label: "MAP" },
-  { href: "/console/allocate", label: "ALLOCATE" },
-  { href: "/console/cascade", label: "CASCADE" },
+  { href: "/console", label: "Command" },
+  { href: "/console/feed", label: "Intake" },
+  { href: "/console/map", label: "Map" },
+  { href: "/console/allocate", label: "Assign" },
+  { href: "/console/cascade", label: "Cascade" },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -30,46 +30,41 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [session]);
 
   if (!ready || !session) {
-    return <div className="p-3 text-[11px] text-[var(--muted)]">AUTH CHECK…</div>;
+    return <div className="p-10 text-xl">Checking duty pass…</div>;
   }
 
   return (
     <div className="min-h-full flex flex-col">
-      <header className="h-12 shrink-0 border-b border-[var(--line)] bg-[#0a0e12] flex items-center gap-4 px-3">
-        <Link href="/console" className="flex items-center gap-2 shrink-0">
+      <header className="shrink-0 border-b-2 border-[var(--rule)] px-6 md:px-10 py-4 flex flex-wrap items-center gap-x-8 gap-y-3">
+        <Link href="/console" className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/mark.png" alt="Aasra" className="h-9 w-9 object-contain" />
+          <img src="/brand/mark.png" alt="Aasra" className="h-14 w-14 object-contain mix-blend-multiply" />
+          <span className="text-2xl font-semibold tracking-tight">Aasra</span>
         </Link>
-        <div className="display text-[15px] tracking-[0.22em] text-[#8ec4e8] hidden sm:block">RELIEFMESH</div>
-        <nav className="flex items-center gap-1 text-[11px] tracking-widest">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className={`px-2 py-1 border ${
-                path === n.href
-                  ? "border-[var(--accent)] text-[var(--accent)]"
-                  : "border-transparent text-[var(--muted)] hover:text-[var(--text)]"
-              }`}
-            >
-              {n.label}
-            </Link>
-          ))}
+        <nav className="flex flex-wrap items-end gap-6 text-xl">
+          {NAV.map((n) => {
+            const on = path === n.href;
+            return (
+              <Link key={n.href} href={n.href} className={on ? "mark text-4xl text-[var(--crit)] leading-none" : "text-[var(--mute)]"}>
+                {n.label}
+              </Link>
+            );
+          })}
         </nav>
-        <Clock />
-        <div className="ml-auto flex items-center gap-3 text-[10px] uppercase tracking-widest text-[var(--muted)]">
-          <span className={firebaseEnabled() ? "text-[var(--ok)]" : "text-[var(--high)]"}>
-            {firebaseEnabled() ? "FIRESTORE LIVE" : "LOCAL STORE"}
+        <div className="ml-auto flex flex-wrap items-center gap-5 text-base">
+          <Clock />
+          <span className={firebaseEnabled() ? "text-[var(--ok)]" : "text-[var(--warn)]"}>
+            {firebaseEnabled() ? "Firestore" : "Local store"}
           </span>
           <span>{session.name}</span>
-          <button type="button" onClick={() => void logout()} className="hover:text-[var(--crit)]">
-            Sign out
-          </button>
-          <button type="button" onClick={() => void injectRoadBlock("NH-16")} className="hover:text-[var(--crit)]">
+          <button type="button" onClick={() => void injectRoadBlock("NH-16")} className="underline decoration-2 underline-offset-4">
             Block NH-16
           </button>
-          <button type="button" onClick={resetSession} className="hover:text-[var(--high)]">
-            Reset feed
+          <button type="button" onClick={resetSession} className="underline decoration-2 underline-offset-4">
+            Reset
+          </button>
+          <button type="button" onClick={() => void logout()} className="underline decoration-2 underline-offset-4">
+            Sign out
           </button>
         </div>
       </header>
@@ -86,5 +81,5 @@ function Clock() {
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, []);
-  return <time className="text-[11px] text-[var(--info)] tabular-nums">{clock}</time>;
+  return <time className="tabular-nums font-medium">{clock}</time>;
 }
