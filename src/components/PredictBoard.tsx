@@ -6,6 +6,7 @@ import { wardById } from "@/lib/geo";
 import { useOperatorGeo } from "@/lib/operatorGeo";
 import type { Assignment, BeforeBrief, ResourceAsset } from "@/lib/types";
 import { useOps } from "@/lib/useOps";
+import { RiskBoard } from "@/components/RiskBoard";
 
 type LiveRisk = {
   ok?: boolean;
@@ -85,6 +86,12 @@ export function PredictBoard() {
 
   const staged = assignments.filter((a) => a.incidentId.startsWith("PREP-") && a.status === "active");
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#risk-assessment") return;
+    document.getElementById("risk-assessment")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [brief, live]);
+
   return (
     <div className="h-full overflow-auto">
       <header className="sticky top-0 z-10 bg-white px-5 py-4 border-b border-[var(--ink)]">
@@ -153,6 +160,10 @@ export function PredictBoard() {
         {staged.length > 0 ? (
           <p className="text-[14px] text-[var(--mute)]">{staged.length} staging assignment(s) already written.</p>
         ) : null}
+
+        <section id="risk-assessment" className="border-t border-[var(--ink)] pt-6">
+          <RiskBoard embedded />
+        </section>
       </div>
     </div>
   );

@@ -18,7 +18,7 @@ type LiveRisk = {
   problems?: { title: string; source: string; url?: string }[];
 };
 
-export function RiskBoard() {
+export function RiskBoard({ embedded = false }: { embedded?: boolean }) {
   const { incidents } = useOps();
   const geo = useOperatorGeo();
   const [live, setLive] = useState<LiveRisk | null>(null);
@@ -41,20 +41,33 @@ export function RiskBoard() {
   const km = live?.boundaryKm ?? 8;
 
   return (
-    <div className="h-full overflow-auto bg-[var(--paper)]">
-      <header className="sticky top-0 z-10 bg-[var(--paper)] px-5 py-4 border-b border-[var(--ink)]">
-        <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Your location · 24–48h</p>
-        <h1 className="mt-1 text-[26px] font-semibold leading-none">Risk</h1>
-        <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
-          Uses this device’s GPS. Map and forecast follow that pin — no area picker.
-        </p>
-        {err ? <p className="mt-2 text-[13px] text-[var(--crit)]">{err}</p> : null}
-      </header>
+    <div className={embedded ? "space-y-4" : "h-full overflow-auto bg-[var(--paper)]"}>
+      {embedded ? (
+        <header>
+          <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Predict · Risk Assessment</p>
+          <h2 className="mt-1 text-[22px] font-semibold leading-none">Risk Assessment</h2>
+          <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
+            Uses this device’s GPS. Map and forecast follow that pin — no area picker.
+          </p>
+          {err ? <p className="mt-2 text-[13px] text-[var(--crit)]">{err}</p> : null}
+        </header>
+      ) : (
+        <header className="sticky top-0 z-10 bg-[var(--paper)] px-5 py-4 border-b border-[var(--ink)]">
+          <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Your location · 24–48h</p>
+          <h1 className="mt-1 text-[26px] font-semibold leading-none">Risk</h1>
+          <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
+            Uses this device’s GPS. Map and forecast follow that pin — no area picker.
+          </p>
+          {err ? <p className="mt-2 text-[13px] text-[var(--crit)]">{err}</p> : null}
+        </header>
+      )}
 
       {!geo ? (
-        <p className="px-5 py-8 text-[16px] text-[var(--mute)]">Allow location to lock this desk to your ground.</p>
+        <p className={embedded ? "text-[16px] text-[var(--mute)]" : "px-5 py-8 text-[16px] text-[var(--mute)]"}>
+          Allow location to lock this desk to your ground.
+        </p>
       ) : (
-        <div className="px-5 py-4 space-y-4">
+        <div className={embedded ? "space-y-4" : "px-5 py-4 space-y-4"}>
           <section className="border border-[var(--ink)] bg-[var(--paper-2)] px-4 py-4">
             <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">
               {live?.label || `${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)}`} · {level}

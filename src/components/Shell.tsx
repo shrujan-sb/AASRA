@@ -6,14 +6,15 @@ import { usePathname, useRouter } from "next/navigation";
 import { BootScreen } from "@/components/site/BootScreen";
 import { useAuth } from "@/lib/auth";
 import { ensureSeeded, resetSession, startLiveFeed } from "@/lib/pipeline";
+import { useLang } from "@/lib/i18n";
+import { LangSwitcher } from "@/components/LangSwitcher";
 import { useOps } from "@/lib/useOps";
 
 const NAV: { href: string; label: string; hint: string; group: string }[] = [
   { href: "/console", label: "Needs", hint: "Ranked tickets", group: "Watch" },
   { href: "/console/priority", label: "Rank", hint: "Life-safety first", group: "Watch" },
   { href: "/console/sitrep", label: "Sitrep", hint: "Duty brief", group: "Watch" },
-  { href: "/console/predict", label: "Predict", hint: "Before landfall", group: "Watch" },
-  { href: "/console/risk", label: "Risk", hint: "24–48h flood", group: "Watch" },
+  { href: "/console/predict", label: "Predict", hint: "AI + risk", group: "Watch" },
   { href: "/console/feed", label: "Wire", hint: "Needs & offers", group: "Watch" },
   { href: "/console/lang", label: "Language", hint: "Detect + English", group: "Watch" },
   { href: "/console/verify", label: "Conflict", hint: "Blocked vs open", group: "Watch" },
@@ -33,6 +34,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const path = usePathname();
   const { incidents, sitrep } = useOps();
+  const { t } = useLang();
   const life = incidents.filter((i) => i.severity === "critical").length;
   const open = incidents.filter((i) => i.status !== "resolved").length;
 
@@ -88,7 +90,10 @@ export function Shell({ children }: { children: ReactNode }) {
           {NAV.map((n) => {
             const showGroup = n.group !== lastGroup;
             lastGroup = n.group;
-            const on = path === n.href;
+            const on =
+              n.href === "/console/predict"
+                ? path === n.href || path.startsWith("/console/predict/")
+                : path === n.href;
             return (
               <div key={n.href}>
                 {showGroup && <p className="ops-nav-group">{n.group}</p>}
@@ -109,7 +114,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="mt-1 truncate">{session.email}</div>
           <div className="mt-3 flex gap-3 text-[var(--mute)]">
             <button type="button" onClick={resetSession}>
-              Reset seed
+              {t("console.reset")}
             </button>
             <button
               type="button"
@@ -117,8 +122,9 @@ export function Shell({ children }: { children: ReactNode }) {
                 void logout().then(() => router.replace("/"));
               }}
             >
-              Sign out
+              {t("console.out")}
             </button>
+            <LangSwitcher />
           </div>
         </div>
       </aside>

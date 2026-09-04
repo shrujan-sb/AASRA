@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Site } from "@/components/site/Site";
 import { useAuth } from "@/lib/auth";
+import { useLang } from "@/lib/i18n";
 import { supportDeskPath } from "@/lib/supportKind";
 import type { BeforeBrief } from "@/lib/types";
 
 export function HomeView() {
   const { session, ready, firebaseReady, authError, signInGoogle } = useAuth();
   const router = useRouter();
+  const { t } = useLang();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +42,7 @@ export function HomeView() {
     <Site>
       <section className="border-b border-[var(--ink)] bg-[var(--paper)]">
         <div className="site-wrap flex flex-wrap items-baseline justify-between gap-3 py-3 text-[13px] text-[var(--mute)]">
-          <p className="tracking-[0.16em] uppercase">Krishna delta edition</p>
+          <p className="tracking-[0.16em] uppercase">{t("home.mast")}</p>
           <p>Vijayawada · Guntur · Tenali</p>
           <p className="tabular-nums">
             <MastheadDate />
@@ -51,25 +53,22 @@ export function HomeView() {
       <section className="border-b border-[var(--ink)]">
         <div className="site-wrap grid w-full items-start gap-14 py-16 lg:grid-cols-12 lg:gap-16 lg:py-20">
           <div className="lg:col-span-7 lg:pt-2">
-            <p className="text-[13px] tracking-[0.16em] uppercase text-[var(--mute)]">Relief mesh · flood week</p>
+            <p className="text-[13px] tracking-[0.16em] uppercase text-[var(--mute)]">{t("home.kicker")}</p>
             <h1 className="mt-4 max-w-[16ch] text-[40px] font-semibold leading-[1.12] tracking-[-0.028em] sm:text-[52px]">
-              Name the place. The <span className="mark">clerk</span> ranks the need.
+              {t("home.title.1")} <span className="mark">{t("home.clerk")}</span> {t("home.title.2")}
             </h1>
             <p className="mt-6 max-w-[48ch] text-[17px] leading-[1.65] text-[var(--mute)]">
-              Aasra is the public door to a sector control room. A household writes a landmark and a need. A duty
-              clerk — not a rumour thread — studies the sentence, sets severity, and points the nearest government
-              desk, NGO, or volunteer. Officers see one queue.
+              {t("home.lede")}
             </p>
             <p className="mt-4 max-w-[48ch] text-[16px] leading-[1.65] text-[var(--mute)]">
-              Three doors, in this order: report help with no account, apply as support with an ID photo, then the
-              admin portal for people already on the allow-list. Google is only for the last two.
+              {t("home.doors")}
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link href="/report" className="site-btn site-btn-ink">
-                Report help
+                {t("nav.report")}
               </Link>
               <Link href="/how-it-works" className="site-btn site-btn-paper">
-                See the pipeline
+                {t("home.pipeline")}
               </Link>
             </div>
           </div>
@@ -77,33 +76,33 @@ export function HomeView() {
           <aside id="desk" className="lg:col-span-5">
             <div className="border border-[var(--ink)] bg-white">
               <div className="flex items-baseline justify-between border-b border-[var(--ink)] px-5 py-3">
-                <p className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">Duty board</p>
+                <p className="text-[13px] tracking-[0.14em] uppercase text-[var(--mute)]">{t("home.board")}</p>
                 <Clock />
               </div>
               <div className="px-5 py-5">
                 <p className="text-[15px] leading-relaxed text-[var(--mute)]">
-                  Pick the door that matches you. Do not sign in to file a public report.
+                  {t("home.pick")}
                 </p>
                 <ol className="mt-4 space-y-3 text-[14px] leading-snug">
                   <li>
-                    <span className="font-semibold">1 · Report help</span>
-                    <span className="block text-[var(--mute)]">No login. Place, need, optional name. The clerk studies it.</span>
+                    <span className="font-semibold">1 · {t("home.d1")}</span>
+                    <span className="block text-[var(--mute)]">{t("home.d1n")}</span>
                   </li>
                   <li>
-                    <span className="font-semibold">2 · Support team</span>
-                    <span className="block text-[var(--mute)]">Government or NGO ID first. After a pass, Google with that Gmail.</span>
+                    <span className="font-semibold">2 · {t("home.d2")}</span>
+                    <span className="block text-[var(--mute)]">{t("home.d2n")}</span>
                   </li>
                   <li>
-                    <span className="font-semibold">3 · Admin portal</span>
-                    <span className="block text-[var(--mute)]">Allow-listed officers only. Google popup. Not for the public.</span>
+                    <span className="font-semibold">3 · {t("home.d3")}</span>
+                    <span className="block text-[var(--mute)]">{t("home.d3n")}</span>
                   </li>
                 </ol>
                 <div className="mt-5 flex flex-col gap-2">
                   <Link href="/report" className="site-btn site-btn-ink w-full">
-                    Report help
+                    {t("nav.report")}
                   </Link>
                   <Link href="/join" className="site-btn site-btn-paper w-full">
-                    Support team
+                    {t("nav.support")}
                   </Link>
                   <button
                     type="button"
@@ -111,7 +110,7 @@ export function HomeView() {
                     onClick={() => void enterAdmin()}
                     className="site-btn site-btn-paper w-full disabled:opacity-50"
                   >
-                    {busy ? "Waiting for Google…" : "Admin portal"}
+                    {busy ? t("home.adminBusy") : t("home.admin")}
                   </button>
                 </div>
                 {(err || authError) && <p className="mt-3 text-[14px] text-[var(--crit)]">{err || authError}</p>}

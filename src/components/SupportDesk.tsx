@@ -10,6 +10,7 @@ import { useOps } from "@/lib/useOps";
 import { claimIncidentHelp, listenApprovedSupport } from "@/lib/support";
 import { isRecommendedFor, kmToIncident, rankNearestSupport } from "@/lib/nearest";
 import { parseSupportKind, supportDeskPath, supportDeskTitle } from "@/lib/supportKind";
+import { LangSwitcher } from "@/components/LangSwitcher";
 import type { ApprovedSupport, Incident, SupportKind } from "@/lib/types";
 
 type Filter = "recommended" | "all" | "mine";
@@ -155,6 +156,9 @@ export function SupportDesk({ kind }: { kind: SupportKind }) {
           >
             Sign out
           </button>
+          <span className="ml-3 inline-block align-middle">
+            <LangSwitcher />
+          </span>
         </div>
       </aside>
       <div className="field-main">

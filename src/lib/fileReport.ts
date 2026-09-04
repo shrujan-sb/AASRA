@@ -56,7 +56,10 @@ async function enrichTicket(payload: FiledReport, location: string, need: string
   ]);
 }
 
-export async function filePublicReport(input: PublicReportInput): Promise<{
+export async function filePublicReport(
+  input: PublicReportInput,
+  opts?: { wait?: boolean },
+): Promise<{
   ok: true;
   id: string;
   incidentId: string;
@@ -73,7 +76,11 @@ export async function filePublicReport(input: PublicReportInput): Promise<{
   }
   const ticket = await buildPublicReport({ ...input, lat, lng });
   const payload = JSON.parse(JSON.stringify(ticket)) as FiledReport;
-  void enrichTicket(payload, input.location, input.need, input.name).catch(() => undefined);
+  const job = enrichTicket(payload, input.location, input.need, input.name).catch((err) => {
+    console.error("file report enrich", err);
+  });
+  if (opts?.wait || input.channel === "phone") await job;
+  else void job;
   return {
     ok: true,
     id: payload.inbox.id,

@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  async redirects() {
+    return [
+      { source: "/console/ai", destination: "/console/predict", permanent: false },
+      { source: "/console/ai/:path*", destination: "/console/predict/:path*", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

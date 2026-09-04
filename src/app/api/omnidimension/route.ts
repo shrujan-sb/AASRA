@@ -57,15 +57,18 @@ async function handle(req: Request) {
     );
   }
 
-  const filed = await filePublicReport({
-    location,
-    need,
-    name: intake.name || undefined,
-    phone: intake.phone || undefined,
-    callId: intake.callId || undefined,
-    channel: "phone",
-    inboxId: intake.callId ? `IN-OD-${intake.callId}` : undefined,
-  });
+  const filed = await filePublicReport(
+    {
+      location,
+      need,
+      name: intake.name || undefined,
+      phone: intake.phone || undefined,
+      callId: intake.callId || undefined,
+      channel: "phone",
+      inboxId: intake.callId ? `IN-OD-${intake.callId}` : undefined,
+    },
+    { wait: true },
+  );
 
   return NextResponse.json({
     ok: true,

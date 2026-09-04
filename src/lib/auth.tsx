@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { firebaseEnabled, getFirebaseAuth, googleProvider } from "@/lib/firebase";
-import { ensureSeedAdmin, isAdminEmail, SEED_ADMIN } from "@/lib/admins";
+import { checkAdminEmail, ensureSeedAdmin, SEED_ADMIN } from "@/lib/admins";
 import { loadApprovedSupport } from "@/lib/support";
 import type { SupportKind } from "@/lib/types";
 
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const local = localStorage.getItem(SESSION_KEY);
             const prev = local ? (JSON.parse(local) as Session) : null;
             const role = prev?.uid === user.uid ? prev.role : storedRole();
-            if (role === "admin" && !isAdminEmail(user.email)) {
+            if (role === "admin" && !(await checkAdminEmail(user.email))) {
               setAuthError("You aren't authorized as an admin");
               setReady(true);
               return;
@@ -109,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const auth = getFirebaseAuth();
         if (!auth) throw new Error("Firebase Auth is not configured");
         const cred = await signInWithPopup(auth, googleProvider);
-        if (role === "admin" && !isAdminEmail(cred.user.email)) {
+        if (role === "admin" && !(await checkAdminEmail(cred.user.email))) {
           await signOut(auth);
           localStorage.removeItem(SESSION_KEY);
           setSession(null);

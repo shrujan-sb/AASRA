@@ -38,7 +38,7 @@ export function GeoRiskMap({ lat, lng, level, boundaryKm, incidents }: Props) {
       mapRef.current = null;
       overlay.current = null;
     };
-  }, [lat, lng]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;

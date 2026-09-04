@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Site } from "@/components/site/Site";
+import { useLang } from "@/lib/i18n";
 
 export default function JoinPage() {
   const router = useRouter();
   const { firebaseReady, signInGoogle, logout, authError } = useAuth();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const { t } = useLang();
 
   async function alreadyApproved() {
     setErr("");
@@ -33,11 +35,10 @@ export default function JoinPage() {
   return (
     <Site>
       <div className="site-wrap py-12 lg:py-16">
-        <p className="text-[13px] tracking-[0.2em] uppercase text-[var(--mute)]">Application desk</p>
-        <h1 className="mt-3 max-w-[16ch] text-[36px] font-semibold tracking-tight">Support team</h1>
+        <p className="text-[13px] tracking-[0.2em] uppercase text-[var(--mute)]">{t("join.kicker")}</p>
+        <h1 className="mt-3 max-w-[16ch] text-[36px] font-semibold tracking-tight">{t("join.title")}</h1>
         <p className="mt-3 max-w-[58ch] text-[17px] leading-relaxed text-[var(--mute)]">
-          Three files. Government, NGO, or volunteer. Photograph the card, pick where you are from (top five suggestions),
-          wait for the stamp. After a pass you land on your own desk.
+          {t("join.lede")}
         </p>
 
         <div className="mt-10 grid gap-4 lg:grid-cols-3">
@@ -51,7 +52,7 @@ export default function JoinPage() {
               <p className="mt-2 text-[15px] leading-relaxed text-[var(--mute)]">
                 Department, designation, posting area from the five suggestions. Own dashboard after approval.
               </p>
-              <p className="mt-5 text-[14px] font-medium">Open this file →</p>
+              <p className="mt-5 text-[14px] font-medium">{t("join.open")}</p>
             </div>
           </Link>
 
@@ -65,7 +66,7 @@ export default function JoinPage() {
               <p className="mt-2 text-[15px] leading-relaxed text-[var(--mute)]">
                 Organisation name, registration, the mandal or town you cover. NGO desk after approval.
               </p>
-              <p className="mt-5 text-[14px] font-medium">Open this file →</p>
+              <p className="mt-5 text-[14px] font-medium">{t("join.open")}</p>
             </div>
           </Link>
 
@@ -79,7 +80,7 @@ export default function JoinPage() {
               <p className="mt-2 text-[15px] leading-relaxed text-[var(--mute)]">
                 Where you are from, what you can do. Volunteer desk after approval.
               </p>
-              <p className="mt-5 text-[14px] font-medium">Open this file →</p>
+              <p className="mt-5 text-[14px] font-medium">{t("join.open")}</p>
             </div>
           </Link>
         </div>

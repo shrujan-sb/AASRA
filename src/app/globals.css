@@ -77,6 +77,24 @@ a { color: inherit; text-decoration: none; }
   color: #fff;
 }
 
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.lang-switch:hover {
+  background: var(--paper-2);
+}
+
 .site-btn-paper {
   background: #fff;
   color: var(--ink);

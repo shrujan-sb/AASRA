@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Site } from "@/components/site/Site";
 import { PlaceField, geocodePlace } from "@/components/PlaceField";
+import { useLang } from "@/lib/i18n";
 
 const DEMOS = [
   { location: "Lane behind old vegetable market, Tenali", need: "need 80 blankets and drinking water, 12 families on first floors", name: "Lakshmi" },
@@ -19,6 +20,7 @@ export default function ReportPage() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const { t } = useLang();
 
   function setPlace(label: string, nextLat?: number, nextLng?: number) {
     setLocation(label);
@@ -91,45 +93,44 @@ export default function ReportPage() {
   return (
     <Site>
       <form onSubmit={(e) => void submit(e)} className="site-wrap py-12">
-        <p className="text-[13px] tracking-[0.18em] uppercase text-[var(--mute)]">Public intake</p>
-        <h1 className="mt-3 max-w-[18ch] text-[32px] font-semibold tracking-tight">Report help</h1>
+        <p className="text-[13px] tracking-[0.18em] uppercase text-[var(--mute)]">{t("report.kicker")}</p>
+        <h1 className="mt-3 max-w-[18ch] text-[32px] font-semibold tracking-tight">{t("report.title")}</h1>
         <p className="mt-2 max-w-[52ch] text-[16px] leading-relaxed text-[var(--mute)]">
-          Type a place and choose from the five names, or drop a pin. Name is optional. Send is instant — the clerk
-          studies it in the background.
+          {t("report.lede")}
         </p>
 
         <div className="mt-10 grid items-start gap-10 lg:grid-cols-12">
           <div className="lg:col-span-5">
-            <label className="block text-[14px] text-[var(--mute)]">Your name (optional)</label>
+            <label className="block text-[14px] text-[var(--mute)]">{t("report.name")}</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="site-input"
-              placeholder="If you want to be reached"
+              placeholder={t("report.namePh")}
             />
 
-            <label className="mt-4 block text-[14px] text-[var(--mute)]">What is needed</label>
+            <label className="mt-4 block text-[14px] text-[var(--mute)]">{t("report.need")}</label>
             <textarea
               required
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={5}
               className="site-textarea"
-              placeholder="Blankets, boat, water, medical…"
+              placeholder={t("report.needPh")}
             />
 
             <button type="submit" disabled={busy} className="site-btn site-btn-ink mt-6 w-full disabled:opacity-50">
-            {busy ? "Sending…" : "Send to desk"}
+            {busy ? t("report.sending") : t("report.send")}
             </button>
             <button type="button" disabled={busy} onClick={() => void demo()} className="site-btn site-btn-paper mt-2 w-full disabled:opacity-50">
-              Demo report
+              {t("report.demo")}
             </button>
-            {sent && <p className="mt-3 text-[var(--ok)]">Desk has the ticket. The nearest team sees it as recommended.</p>}
+            {sent && <p className="mt-3 text-[var(--ok)]">{t("report.ok")}</p>}
             {err && <p className="mt-3 text-[var(--crit)]">{err}</p>}
           </div>
 
           <div className="relative z-10 lg:col-span-7">
-            <label className="block text-[14px] text-[var(--mute)]">Location</label>
+            <label className="block text-[14px] text-[var(--mute)]">{t("report.loc")}</label>
             <PlaceField value={location} lat={lat} lng={lng} onChange={setPlace} />
           </div>
         </div>

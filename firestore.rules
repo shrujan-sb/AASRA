@@ -30,6 +30,10 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
     }
+    match /admins/{id} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.resource.data.email is string;
+    }
     match /{document=**} {
       allow read, write: if isSignedIn();
     }
