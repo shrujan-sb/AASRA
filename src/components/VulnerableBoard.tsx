@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { wardById } from "@/lib/geo";
 import type { PrepAssetKind, PrepVulnerable } from "@/lib/types";
 import { useOps } from "@/lib/useOps";
@@ -63,33 +63,21 @@ export function VulnerableBoard() {
     }
   }
 
+  useEffect(() => {
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="h-full overflow-auto bg-[var(--paper)]">
       <header className="sticky top-0 z-10 bg-[var(--paper)] px-5 py-4 border-b border-[var(--ink)]">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">If the flood comes</p>
-            <h1 className="mt-1 text-[26px] font-semibold leading-none">Vulnerable</h1>
-          </div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run()}
-            className="h-10 px-4 bg-[var(--ink)] text-[var(--paper)] disabled:opacity-50"
-          >
-            {busy ? "Clerk thinking…" : sites.length ? "Run again" : "Ask the clerk"}
-          </button>
-        </div>
+        <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">If flood comes</p>
+        <h1 className="mt-1 text-[26px] font-semibold leading-none">Vulnerable</h1>
         {err ? <p className="mt-2 text-[13px] text-[var(--crit)]">{err}</p> : null}
       </header>
 
       {!sites.length ? (
-        <div className="px-5 py-8 max-w-[62ch]">
-          <p className="text-[16px] leading-relaxed text-[var(--mute)]">
-            Given flood is likely, the clerk lists schools, hospitals, elderly homes, roads, substations, and shelters
-            that take the first hit — an operational list, not a map.
-          </p>
-        </div>
+        <p className="px-5 py-8 text-[16px] text-[var(--mute)]">{busy ? "Loading sites…" : "No sites yet."}</p>
       ) : (
         <div className="px-5 py-5 space-y-6">
           <section className="border border-[var(--ink)] bg-[var(--paper-2)] px-4 py-4">

@@ -1,115 +1,85 @@
 "use client";
 
-import { useState } from "react";
-import type { PrepRisk } from "@/lib/types";
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import { useOps } from "@/lib/useOps";
+import { useOperatorGeo } from "@/lib/operatorGeo";
 
-type PredictRiskResponse = {
+const GeoRiskMap = dynamic(() => import("@/components/GeoRiskMap").then((m) => m.GeoRiskMap), { ssr: false });
+
+type LiveRisk = {
   ok?: boolean;
-  studied?: boolean;
-  model?: string;
-  windowHours?: number;
+  label?: string;
+  level?: "high" | "elevated" | "watch";
   headline?: string;
-  wards?: PrepRisk[];
-  error?: string;
+  rainMm?: number;
+  rainChance?: number;
+  boundaryKm?: number;
+  problems?: { title: string; source: string; url?: string }[];
 };
 
 export function RiskBoard() {
-  const { incidents, hazards } = useOps();
-  const [wards, setWards] = useState<PrepRisk[]>([]);
-  const [headline, setHeadline] = useState("");
-  const [windowHours, setWindowHours] = useState(48);
-  const [model, setModel] = useState("");
-  const [studied, setStudied] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { incidents } = useOps();
+  const geo = useOperatorGeo();
+  const [live, setLive] = useState<LiveRisk | null>(null);
   const [err, setErr] = useState("");
 
-  async function run() {
-    setBusy(true);
-    setErr("");
-    try {
-      const res = await fetch("/api/predict-risk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ incidents, hazards }),
-      });
-      const data = (await res.json()) as PredictRiskResponse;
-      if (!res.ok || !data.ok || !data.wards?.length) {
-        setErr(data.error || "Risk desk failed.");
-        return;
-      }
-      setWards(data.wards);
-      setHeadline(data.headline || data.wards[0].blurb);
-      setWindowHours(data.windowHours ?? 48);
-      setModel(data.model || "");
-      setStudied(Boolean(data.studied));
-    } catch {
-      setErr("Risk desk failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  useEffect(() => {
+    if (!geo) return;
+    const ac = new AbortController();
+    void fetch(`/api/live-risk?lat=${geo.lat}&lng=${geo.lng}`, { signal: ac.signal })
+      .then((r) => r.json())
+      .then((data: LiveRisk) => {
+        if (data.ok) setLive(data);
+        else setErr("Could not read live weather for this pin.");
+      })
+      .catch(() => setErr("Live risk request failed."));
+    return () => ac.abort();
+  }, [geo?.lat, geo?.lng]);
+
+  const level = live?.level ?? "watch";
+  const km = live?.boundaryKm ?? 8;
 
   return (
     <div className="h-full overflow-auto bg-[var(--paper)]">
       <header className="sticky top-0 z-10 bg-[var(--paper)] px-5 py-4 border-b border-[var(--ink)]">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">24–48 hours</p>
-            <h1 className="mt-1 text-[26px] font-semibold leading-none">Risk</h1>
-          </div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run()}
-            className="h-10 px-4 bg-[var(--ink)] text-[var(--paper)] disabled:opacity-50"
-          >
-            {busy ? "Clerk thinking…" : wards.length ? "Run again" : "Ask the clerk"}
-          </button>
-        </div>
+        <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Your location · 24–48h</p>
+        <h1 className="mt-1 text-[26px] font-semibold leading-none">Risk</h1>
+        <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--mute)]">
+          Uses this device’s GPS. Map and forecast follow that pin — no area picker.
+        </p>
         {err ? <p className="mt-2 text-[13px] text-[var(--crit)]">{err}</p> : null}
       </header>
 
-      {!wards.length ? (
-        <div className="px-5 py-8 max-w-[62ch]">
-          <p className="text-[16px] leading-relaxed text-[var(--mute)]">
-            Krishna-delta wards — Vijayawada, Guntur, Tenali. The clerk reads rainfall, terrain, flood history, and
-            population, then writes a 24–48 hour flood-risk sentence for each ward.
-          </p>
-        </div>
+      {!geo ? (
+        <p className="px-5 py-8 text-[16px] text-[var(--mute)]">Allow location to lock this desk to your ground.</p>
       ) : (
-        <div className="px-5 py-5 space-y-6">
+        <div className="px-5 py-4 space-y-4">
           <section className="border border-[var(--ink)] bg-[var(--paper-2)] px-4 py-4">
             <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">
-              {windowHours}h window
-              {studied ? (model ? ` · ${model}` : "") : " · desk heuristic"}
+              {live?.label || `${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)}`} · {level}
+              {typeof live?.rainMm === "number" ? ` · ${live.rainMm} mm` : ""}
             </p>
-            <p className="mt-2 text-[20px] font-semibold leading-snug">{headline}</p>
+            <p className="mt-2 text-[20px] font-semibold leading-snug">
+              {live?.headline || "Reading rain and nearby alerts for your pin…"}
+            </p>
           </section>
-
-          <section>
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Krishna delta</p>
-            <h2 className="mt-1 text-[20px] font-semibold">Wards</h2>
-            <ul className="mt-3 border border-[var(--ink)] bg-white">
-              {wards.map((r) => (
-                <li key={r.wardId} className="border-b border-[var(--rule)] last:border-0 px-4 py-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-semibold">
-                      {r.wardName}{" "}
-                      <span className="font-normal text-[var(--mute)]">· {r.horizonHours}h</span>
-                    </span>
-                    <span className={r.level === "high" ? "text-[var(--crit)] font-semibold" : "text-[var(--mute)]"}>
-                      {r.level}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[15px] leading-snug">{r.blurb}</p>
-                  {r.drivers.length ? (
-                    <p className="mt-1 text-[12px] text-[var(--mute)]">{r.drivers.join(" · ")}</p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </section>
+          <div className="border border-[var(--ink)] overflow-hidden">
+            <GeoRiskMap lat={geo.lat} lng={geo.lng} level={level} boundaryKm={km} incidents={incidents} />
+          </div>
+          {live?.problems && live.problems.length > 0 ? (
+            <section>
+              <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Live web</p>
+              <ul className="mt-2 border border-[var(--ink)] bg-white">
+                {live.problems.map((p, i) => (
+                  <li key={`${p.title}-${i}`} className="border-b border-[var(--rule)] last:border-0 px-4 py-3">
+                    <p className="font-medium leading-snug">{p.title}</p>
+                    <p className="mt-1 text-[12px] text-[var(--mute)]">{p.source}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       )}
     </div>

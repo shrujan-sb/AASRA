@@ -208,6 +208,8 @@ export function SupportDesk({ kind }: { kind: SupportKind }) {
                     <div className="mt-1 text-[13px] text-[var(--mute)]">
                       {i.locationLabel}
                       {typeof km === "number" && Number.isFinite(km) && km < 9000 ? ` · ${km} km from your area` : ""}
+                      {i.phone ? ` · ${i.phone}` : ""}
+                      {i.channel === "phone" ? " · phone desk" : ""}
                     </div>
                     {i.reason?.summary && <p className="mt-2 text-[14px] leading-relaxed">{i.reason.summary}</p>}
                     {i.nearest && i.nearest.length > 0 && (

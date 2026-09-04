@@ -2,6 +2,7 @@
 
 import type { VerifyClerkAsk } from "@/lib/agents/verification";
 import { getAll, nid, upsert } from "@/lib/db";
+import { rankOpenIncidents } from "@/lib/instantPriority";
 import type { Assignment, Hazard, Incident, InfraAsset, ResourceAsset, Sitrep, VerificationTag } from "@/lib/types";
 
 export function opsSnapshot() {
@@ -32,18 +33,43 @@ async function persistOps(data: {
   }
 }
 
+let prioritizeInFlight: Promise<{ ok: boolean; studied: boolean }> | null = null;
+
 export async function requestPrioritize() {
   if (typeof window === "undefined") return { ok: false as const, studied: false };
-  const incidents = getAll<Incident>("incidents");
-  const res = await fetch("/api/prioritize", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ incidents }),
+  if (prioritizeInFlight) return prioritizeInFlight;
+  const run = (async () => {
+    const incidents = getAll<Incident>("incidents");
+    const local = rankOpenIncidents(incidents);
+    for (const i of local) await upsert("incidents", i.id, i);
+    const slim = local.map((i) => ({
+      id: i.id,
+      title: i.title,
+      resource: i.resource,
+      quantity: i.quantity,
+      locationLabel: i.locationLabel,
+      locationId: i.locationId,
+      heuristicScore: i.heuristicScore ?? i.priorityScore,
+      priorityScore: i.priorityScore,
+      severity: i.severity,
+      verification: i.verification,
+      priorityWhy: i.priorityWhy,
+      status: i.status,
+    }));
+    const res = await fetch("/api/prioritize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ incidents: slim }),
+    });
+    const data = (await res.json()) as { ok?: boolean; incidents?: Incident[]; studied?: boolean };
+    if (!res.ok || !data.ok) return { ok: true as const, studied: false };
+    for (const i of data.incidents ?? []) await upsert("incidents", i.id, i);
+    return { ok: true as const, studied: Boolean(data.studied) };
+  })().finally(() => {
+    prioritizeInFlight = null;
   });
-  const data = (await res.json()) as { ok?: boolean; incidents?: Incident[]; studied?: boolean };
-  if (!res.ok || !data.ok) return { ok: false as const, studied: false };
-  for (const i of data.incidents ?? []) await upsert("incidents", i.id, i);
-  return { ok: true as const, studied: Boolean(data.studied) };
+  prioritizeInFlight = run;
+  return run;
 }
 
 export async function requestAssign(incidentId?: string) {

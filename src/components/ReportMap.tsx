@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { tileUrl } from "@/lib/places";
+import { readCachedGeo } from "@/lib/operatorGeo";
 
-const FALLBACK = { lat: 16.5062, lng: 80.648 };
+const FALLBACK = { lat: 20.5937, lng: 78.9629 };
 
 type Props = {
   lat?: number;
@@ -22,13 +23,20 @@ export function ReportMap({ lat, lng, onPick }: Props) {
 
   useEffect(() => {
     if (!host.current || mapRef.current) return;
-    const map = L.map(host.current, { scrollWheelZoom: true }).setView([FALLBACK.lat, FALLBACK.lng], 12);
+    const here = readCachedGeo();
+    const start = here ?? FALLBACK;
+    const map = L.map(host.current, { scrollWheelZoom: true }).setView([start.lat, start.lng], here ? 13 : 5);
     L.tileLayer(tileUrl(), {
       attribution: "&copy; OpenStreetMap",
       maxZoom: 20,
     }).addTo(map);
     map.on("click", (e: L.LeafletMouseEvent) => pickRef.current(e.latlng.lat, e.latlng.lng));
     mapRef.current = map;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        map.setView([pos.coords.latitude, pos.coords.longitude], 13);
+      });
+    }
     requestAnimationFrame(() => map.invalidateSize());
     return () => {
       map.remove();

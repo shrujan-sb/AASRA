@@ -32,9 +32,7 @@ export function MapBoard() {
           <div>
             <p className="ops-kicker">Ground</p>
             <h1 className="text-[22px] font-semibold leading-none">Map</h1>
-            <p className="mt-1 text-[13px] text-[var(--mute)]">
-              Every open emergency is a pin. Critical red, urgent amber, routine green.
-            </p>
+            <p className="mt-1 text-[13px] text-[var(--mute)]">Pins follow live tickets. Map opens on your GPS.</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="ops-chip ops-chip-critical">{open.length} live</span>

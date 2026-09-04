@@ -82,19 +82,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <b>{sitrep?.sheltersNearCapacity ?? 0}</b>
             </div>
           </div>
-          {sitrep?.headline && (
-            <p className="mt-2 text-[12px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>
-          )}
-          {sitrep?.predictedShortage && (
-            <p className="mt-1 text-[12px] leading-snug">{sitrep.predictedShortage}</p>
-          )}
         </div>
-
-        {life > 0 && (
-          <p className="ops-life">
-            {life} life-safety ticket{life === 1 ? "" : "s"} on Needs. Rank before blankets.
-          </p>
-        )}
 
         <nav className="flex-1 overflow-auto py-1">
           {NAV.map((n) => {

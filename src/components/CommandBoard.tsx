@@ -70,7 +70,7 @@ export function CommandBoard() {
         <header className="ops-head">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="ops-kicker">Krishna delta · sitrep</p>
+              <p className="ops-kicker">Queue</p>
               <h1>Needs board</h1>
               {sitrep?.headline ? (
                 <p className="mt-2 max-w-[40rem] text-[13px] leading-snug text-[var(--mute)]">{sitrep.headline}</p>

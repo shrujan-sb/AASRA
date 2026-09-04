@@ -1,74 +1,86 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { nid, upsert } from "@/lib/db";
 import { wardById } from "@/lib/geo";
+import { useOperatorGeo } from "@/lib/operatorGeo";
 import type { Assignment, BeforeBrief, ResourceAsset } from "@/lib/types";
 import { useOps } from "@/lib/useOps";
 
-const KINDS = ["school", "hospital", "elderly", "road", "substation", "shelter"] as const;
+type LiveRisk = {
+  ok?: boolean;
+  label?: string;
+  headline?: string;
+  level?: string;
+  problems?: { title: string; source: string }[];
+};
 
 export function PredictBoard() {
   const { resources, incidents, hazards, assignments } = useOps();
+  const geo = useOperatorGeo();
   const [brief, setBrief] = useState<BeforeBrief | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState<LiveRisk | null>(null);
   const [err, setErr] = useState("");
   const [applied, setApplied] = useState(false);
 
-  async function run() {
-    setBusy(true);
-    setErr("");
-    setApplied(false);
-    try {
-      const res = await fetch("/api/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resources, incidents, hazards }),
-      });
-      const data = (await res.json()) as { ok?: boolean; brief?: BeforeBrief; error?: string };
-      if (!res.ok || !data.brief) {
-        setErr(data.error || "Predict desk failed.");
-        return;
-      }
-      setBrief(data.brief);
-    } catch {
-      setErr("Predict desk failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  useEffect(() => {
+    const ac = new AbortController();
+    void fetch("/api/predict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        resources: resources.map((r) => ({ id: r.id, callsign: r.callsign, kind: r.kind, status: r.status, locationId: r.locationId, skills: r.skills, equipment: r.equipment })),
+        incidents: incidents.filter((i) => i.status !== "resolved").map((i) => ({ id: i.id, title: i.title, locationId: i.locationId, severity: i.severity, status: i.status })),
+        hazards: hazards.map((h) => ({ id: h.id, label: h.label, status: h.status, roadId: h.roadId })),
+      }),
+      signal: ac.signal,
+    })
+      .then((r) => r.json())
+      .then((data: { brief?: BeforeBrief }) => {
+        if (data.brief) setBrief(data.brief);
+      })
+      .catch(() => setErr("Predict failed."));
+    return () => ac.abort();
+  }, [incidents.length, resources.length, hazards.length]);
+
+  useEffect(() => {
+    if (!geo) return;
+    const ac = new AbortController();
+    void fetch(`/api/live-risk?lat=${geo.lat}&lng=${geo.lng}`, { signal: ac.signal })
+      .then((r) => r.json())
+      .then((data: LiveRisk) => {
+        if (data.ok) setLive(data);
+      })
+      .catch(() => undefined);
+    return () => ac.abort();
+  }, [geo?.lat, geo?.lng]);
 
   async function applyMoves() {
     if (!brief?.moves.length) return;
-    setBusy(true);
-    try {
-      for (const m of brief.moves) {
-        const unit = resources.find((r) => r.id === m.resourceId);
-        if (!unit || unit.status !== "free") continue;
-        const next: ResourceAsset = {
-          ...unit,
-          locationId: m.toId,
-          status: "en_route",
-          notes: `Pre-position to ${m.toLabel}`,
-        };
-        await upsert("resources", unit.id, next);
-        const row: Assignment = {
-          id: nid("PREP"),
-          incidentId: `PREP-${m.toId}`,
-          resourceId: unit.id,
-          reason: `Before cyclone: ${m.callsign} ${wardById(m.fromId).name} → ${m.toLabel}. ${m.why}`,
-          etaMin: 18,
-          viaRoadIds: [],
-          status: "active",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        await upsert("assignments", row.id, row);
-      }
-      setApplied(true);
-    } finally {
-      setBusy(false);
+    for (const m of brief.moves) {
+      const unit = resources.find((r) => r.id === m.resourceId);
+      if (!unit || unit.status !== "free") continue;
+      const next: ResourceAsset = {
+        ...unit,
+        locationId: m.toId,
+        status: "en_route",
+        notes: `Pre-position to ${m.toLabel}`,
+      };
+      await upsert("resources", unit.id, next);
+      const row: Assignment = {
+        id: nid("PREP"),
+        incidentId: `PREP-${m.toId}`,
+        resourceId: unit.id,
+        reason: `${m.callsign} → ${m.toLabel}. ${m.why}`,
+        etaMin: 18,
+        viaRoadIds: [],
+        status: "active",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await upsert("assignments", row.id, row);
     }
+    setApplied(true);
   }
 
   const staged = assignments.filter((a) => a.incidentId.startsWith("PREP-") && a.status === "active");
@@ -78,111 +90,53 @@ export function PredictBoard() {
       <header className="sticky top-0 z-10 bg-white px-5 py-4 border-b border-[var(--ink)]">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Before landfall</p>
+            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Live · your pin</p>
             <h1 className="mt-1 text-[26px] font-semibold leading-none">Predict</h1>
           </div>
-          <div className="flex flex-wrap gap-2">
+          {brief?.moves.length ? (
             <button
               type="button"
-              disabled={busy}
-              onClick={() => void run()}
-              className="h-10 px-4 bg-[var(--ink)] text-white disabled:opacity-50"
+              disabled={applied}
+              onClick={() => void applyMoves()}
+              className="h-10 px-4 border border-[var(--ink)] bg-white disabled:opacity-50"
             >
-              {busy ? "Clerk thinking…" : brief ? "Run again" : "Ask the clerk"}
+              {applied ? "Moves written" : "Apply staging"}
             </button>
-            {brief?.moves.length ? (
-              <button
-                type="button"
-                disabled={busy || applied}
-                onClick={() => void applyMoves()}
-                className="h-10 px-4 border border-[var(--ink)] bg-white disabled:opacity-50"
-              >
-                {applied ? "Moves written" : "Apply staging"}
-              </button>
-            ) : null}
-          </div>
+          ) : null}
         </div>
         {err ? <p className="mt-2 text-[13px] text-[var(--crit)]">{err}</p> : null}
       </header>
 
-      {!brief ? (
-        <div className="px-5 py-8 max-w-[62ch]">
-          <p className="text-[16px] leading-relaxed text-[var(--mute)]">
-            Rainfall, terrain, flood history, and population for Vijayawada, Guntur, and Tenali. The clerk writes ward
-            risk for the next 24–48 hours, lists what gets hit, and stages boats, medical cells, and tankers before the
-            cyclone arrives.
+      <div className="px-5 py-5 space-y-6">
+        <section className="ops-dossier">
+          <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">
+            {live?.label || (geo ? `${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)}` : "Waiting for GPS")}
+            {live?.level ? ` · ${live.level}` : ""}
           </p>
-          {staged.length > 0 ? (
-            <p className="mt-4 text-[14px]">
-              {staged.length} pre-position assignment{staged.length === 1 ? "" : "s"} already on the desk.
-            </p>
-          ) : null}
-        </div>
-      ) : (
-        <div className="px-5 py-5 space-y-8">
-          <section className="ops-dossier">
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">
-              {brief.windowHours}h window{brief.fallback ? " · desk heuristic" : brief.model ? ` · ${brief.model}` : ""}
-            </p>
-            <p className="mt-2 text-[20px] font-semibold leading-snug">{brief.headline}</p>
-            <p className="mt-3 text-[15px] leading-relaxed">{brief.orders}</p>
-          </section>
+          <p className="mt-2 text-[20px] font-semibold leading-snug">
+            {live?.headline || brief?.headline || "Reading rain and web alerts for this device…"}
+          </p>
+          {brief?.orders ? <p className="mt-3 text-[15px] leading-relaxed">{brief.orders}</p> : null}
+        </section>
 
+        {live?.problems && live.problems.length > 0 ? (
           <section>
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Risk</p>
-            <h2 className="mt-1 text-[20px] font-semibold">Wards</h2>
-            <ul className="mt-3 border border-[var(--ink)]">
-              {brief.risks.map((r) => (
-                <li key={r.wardId} className="border-b border-[var(--rule)] last:border-0 px-4 py-3">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-semibold">
-                      {r.wardName}{" "}
-                      <span className="font-normal text-[var(--mute)]">· {r.horizonHours}h</span>
-                    </span>
-                    <span className={r.level === "high" ? "text-[var(--crit)] font-semibold" : "text-[var(--mute)]"}>
-                      {r.level}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[14px] leading-snug">{r.blurb}</p>
-                  <p className="mt-1 text-[12px] text-[var(--mute)]">{r.drivers.join(" · ")}</p>
+            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Live problems</p>
+            <ul className="mt-2 border border-[var(--ink)]">
+              {live.problems.map((p, i) => (
+                <li key={`${p.title}-${i}`} className="border-b border-[var(--rule)] last:border-0 px-4 py-3">
+                  <p className="font-medium leading-snug">{p.title}</p>
+                  <p className="mt-1 text-[12px] text-[var(--mute)]">{p.source}</p>
                 </li>
               ))}
             </ul>
           </section>
+        ) : null}
 
+        {brief?.moves.length ? (
           <section>
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">If the flood comes</p>
-            <h2 className="mt-1 text-[20px] font-semibold">What is hit</h2>
-            <div className="mt-3 overflow-x-auto border border-[var(--ink)]">
-              <table className="w-full text-left text-[14px]">
-                <thead>
-                  <tr className="border-b border-[var(--ink)] text-[11px] uppercase tracking-[0.12em] text-[var(--mute)]">
-                    <th className="px-3 py-2 font-medium">Kind</th>
-                    <th className="px-3 py-2 font-medium">Site</th>
-                    <th className="px-3 py-2 font-medium">Ward</th>
-                    <th className="px-3 py-2 font-medium">Hit</th>
-                    <th className="px-3 py-2 font-medium">Move</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {brief.vulnerable.map((v, i) => (
-                    <tr key={`${v.kind}-${v.name}-${i}`} className="border-b border-[var(--rule)] last:border-0">
-                      <td className="px-3 py-2 whitespace-nowrap">{KINDS.includes(v.kind) ? v.kind : v.kind}</td>
-                      <td className="px-3 py-2 font-medium">{v.name}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{v.wardId}</td>
-                      <td className="px-3 py-2 text-[var(--mute)]">{v.why}</td>
-                      <td className="px-3 py-2">{v.action}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section>
-            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Pre-position</p>
-            <h2 className="mt-1 text-[20px] font-semibold">Recommended moves</h2>
-            <ul className="mt-3 border border-[var(--ink)]">
+            <p className="text-[11px] tracking-[0.18em] uppercase text-[var(--mute)]">Stage</p>
+            <ul className="mt-2 border border-[var(--ink)]">
               {brief.moves.map((m) => (
                 <li key={`${m.resourceId}-${m.toId}`} className="flex flex-wrap gap-3 border-b border-[var(--rule)] last:border-0 px-4 py-3">
                   <span className="w-36 font-medium">{m.callsign}</span>
@@ -194,8 +148,12 @@ export function PredictBoard() {
               ))}
             </ul>
           </section>
-        </div>
-      )}
+        ) : null}
+
+        {staged.length > 0 ? (
+          <p className="text-[14px] text-[var(--mute)]">{staged.length} staging assignment(s) already written.</p>
+        ) : null}
+      </div>
     </div>
   );
 }

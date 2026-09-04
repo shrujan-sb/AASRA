@@ -10,6 +10,10 @@ export type PublicReportInput = {
   name?: string;
   lat?: number;
   lng?: number;
+  phone?: string;
+  callId?: string;
+  channel?: "web" | "phone";
+  inboxId?: string;
 };
 
 export async function buildPublicReport(input: PublicReportInput): Promise<{
@@ -23,10 +27,15 @@ export async function buildPublicReport(input: PublicReportInput): Promise<{
   const pin =
     input.lat != null && input.lng != null ? ` [${input.lat.toFixed(5)}, ${input.lng.toFixed(5)}]` : "";
   const who = input.name?.trim();
+  const phone = input.phone?.trim();
+  const channel = input.channel ?? "web";
+  const inboxId = input.inboxId || nid("IN");
+  const desk = channel === "phone" ? "Phone desk" : "Public report";
+  const sourceBits = [desk, who, phone].filter(Boolean);
   const inbox: InboxMessage = {
-    id: nid("IN"),
+    id: inboxId,
     rawText: `need help at ${loc}${pin}: ${need}`,
-    source: who ? `Public report · ${who}` : "Public report",
+    source: sourceBits.join(" · "),
     timestamp: Date.now(),
     processed: true,
   };
@@ -69,6 +78,9 @@ export async function buildPublicReport(input: PublicReportInput): Promise<{
     updatedAt: inbox.timestamp,
     lat: input.lat,
     lng: input.lng,
+    phone,
+    callId: input.callId,
+    channel,
   };
   const log: AgentLog = {
     id: nid("LOG"),

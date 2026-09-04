@@ -52,6 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const firebaseReady = firebaseEnabled();
 
   useEffect(() => {
+    const stored = localStorage.getItem(SESSION_KEY);
+    if (stored) {
+      try {
+        setSession(JSON.parse(stored) as Session);
+      } catch {
+        /* ignore */
+      }
+    }
     void ensureSeedAdmin();
     const auth = getFirebaseAuth();
     const storedRole = () => (localStorage.getItem(ROLE_KEY) as Role | null) ?? "admin";
@@ -59,26 +67,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (auth) {
       return onAuthStateChanged(auth, (user: User | null) => {
         void (async () => {
-          await ensureSeedAdmin();
           if (user) {
             const local = localStorage.getItem(SESSION_KEY);
             const prev = local ? (JSON.parse(local) as Session) : null;
             const role = prev?.uid === user.uid ? prev.role : storedRole();
             if (role === "admin" && !isAdminEmail(user.email)) {
-              await signOut(auth);
-              localStorage.removeItem(SESSION_KEY);
-              setSession(null);
               setAuthError("You aren't authorized as an admin");
               setReady(true);
               return;
             }
-            let supportKind: SupportKind | undefined;
+            let supportKind: SupportKind | undefined = prev?.supportKind;
             if (role === "support") {
               const profile = await loadApprovedSupport(user.email);
               if (!profile) {
-                await signOut(auth);
-                localStorage.removeItem(SESSION_KEY);
-                setSession(null);
                 setAuthError("You aren't approved as support yet. Submit an application first.");
                 setReady(true);
                 return;
@@ -88,16 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const next = withRole(user, role, supportKind);
             localStorage.setItem(SESSION_KEY, JSON.stringify(next));
             setSession(next);
-          } else {
-            localStorage.removeItem(SESSION_KEY);
-            setSession(null);
           }
           setReady(true);
         })();
       });
     }
-    const local = localStorage.getItem(SESSION_KEY);
-    setSession(local ? (JSON.parse(local) as Session) : null);
     setReady(true);
   }, []);
 
@@ -110,7 +106,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInGoogle: async (role) => {
         setAuthError("");
         localStorage.setItem(ROLE_KEY, role);
-        await ensureSeedAdmin();
         const auth = getFirebaseAuth();
         if (!auth) throw new Error("Firebase Auth is not configured");
         const cred = await signInWithPopup(auth, googleProvider);

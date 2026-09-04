@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { incidentLatLng } from "@/lib/geo";
+import { readCachedGeo } from "@/lib/operatorGeo";
 import { tileUrl } from "@/lib/places";
 import type { Incident } from "@/lib/types";
 
@@ -40,10 +41,19 @@ export function OpsEmergenciesMap({ incidents, selectedId, onSelect }: Props) {
 
   useEffect(() => {
     if (!host.current || mapRef.current) return;
-    const map = L.map(host.current, { scrollWheelZoom: true }).setView([16.48, 80.62], 11);
+    const here = readCachedGeo();
+    const map = L.map(host.current, { scrollWheelZoom: true }).setView(
+      here ? [here.lat, here.lng] : [20.5937, 78.9629],
+      here ? 12 : 5,
+    );
     L.tileLayer(tileUrl(), { attribution: "&copy; OpenStreetMap", maxZoom: 19 }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        map.setView([pos.coords.latitude, pos.coords.longitude], 12);
+      });
+    }
     requestAnimationFrame(() => map.invalidateSize());
     return () => {
       map.remove();
@@ -72,6 +82,10 @@ export function OpsEmergenciesMap({ incidents, selectedId, onSelect }: Props) {
     }
     if (latlngs.length === 1) map.setView(latlngs[0]!, 14);
     else if (latlngs.length > 1) map.fitBounds(L.latLngBounds(latlngs), { padding: [28, 28], maxZoom: 14 });
+    else {
+      const here = readCachedGeo();
+      if (here) map.setView([here.lat, here.lng], 12);
+    }
     requestAnimationFrame(() => map.invalidateSize());
   }, [stamp, pins, selectedId]);
 

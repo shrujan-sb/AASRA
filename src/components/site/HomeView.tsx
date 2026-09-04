@@ -9,7 +9,7 @@ import { supportDeskPath } from "@/lib/supportKind";
 import type { BeforeBrief } from "@/lib/types";
 
 export function HomeView() {
-  const { session, ready, firebaseReady, authError, signInGoogle, logout } = useAuth();
+  const { session, ready, firebaseReady, authError, signInGoogle } = useAuth();
   const router = useRouter();
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,7 +24,6 @@ export function HomeView() {
     setErr("");
     setBusy(true);
     try {
-      await logout();
       if (!firebaseReady) {
         setErr("Google sign-in is required for the admin portal.");
         return;

@@ -74,6 +74,9 @@ export type Incident = {
   nearest?: IncidentNear[];
   aiPick?: IncidentPick;
   claimNote?: string;
+  phone?: string;
+  callId?: string;
+  channel?: "web" | "phone";
 };
 
 export type IncidentReason = {

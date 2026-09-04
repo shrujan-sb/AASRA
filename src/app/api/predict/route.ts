@@ -32,7 +32,7 @@ async function run(body: { resources?: unknown; incidents?: unknown; hazards?: u
 }
 
 export async function GET() {
-  const data = await run({}, 8000);
+  const data = await run({}, 0);
   return NextResponse.json(data);
 }
 
@@ -43,6 +43,6 @@ export async function POST(req: Request) {
   } catch {
     body = {};
   }
-  const data = await run(body, 32000);
+  const data = await run(body, 0);
   return NextResponse.json(data);
 }
