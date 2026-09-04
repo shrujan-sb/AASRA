@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { firebaseEnabled } from "@/lib/firebase";
-import { ensureSeeded, resetSession, startLiveFeed } from "@/lib/pipeline";
+import { ensureSeeded, injectRoadBlock, resetSession, startLiveFeed } from "@/lib/pipeline";
 
 const NAV = [
   { href: "/console", label: "COMMAND" },
@@ -64,6 +64,9 @@ export function Shell({ children }: { children: ReactNode }) {
           <span>{session.name}</span>
           <button type="button" onClick={() => void logout()} className="hover:text-[var(--crit)]">
             Sign out
+          </button>
+          <button type="button" onClick={() => void injectRoadBlock("NH-16")} className="hover:text-[var(--crit)]">
+            Block NH-16
           </button>
           <button type="button" onClick={resetSession} className="hover:text-[var(--high)]">
             Reset feed
